@@ -79,6 +79,12 @@ def apply(reference, decoded):
     # Keep the original main-thread statistics/preparation scheduling and SDL lookup.
     for name in ['smali/a/H.smali', 'smali/org/libsdl/app/SDLJoystickHandler_API16.smali']:
         (decoded / name).write_bytes((reference / name).read_bytes())
+    menu = decoded / 'smali/com/naruto/r2/GameMenu$1.smali'
+    text = menu.read_text()
+    resume = 'Lcom/naruto/r2/GameLoop;->resume(Lcom/naruto/port/NarutoActivity;)V'
+    if text.count(resume) != 1:
+        raise ValueError('Game-menu statistics callback changed')
+    menu.write_text(text.replace(resume, 'Lcom/naruto/r2/GameHooks;->resumeOriginalStats(Lcom/naruto/port/NarutoActivity;)V'))
 
     # Retain all original touch rendering and editing, with unused typed bridges for menus.
     touch = (reference / 'smali/a/l0.smali').read_text()
@@ -157,6 +163,9 @@ def verify(reference, decoded):
     for name in ['smali/a/H.smali', 'smali/org/libsdl/app/SDLJoystickHandler_API16.smali']:
         if (decoded / name).read_bytes() != (reference / name).read_bytes():
             raise AssertionError('Startup test changed original scheduler/input: ' + name)
+    menu = (decoded / 'smali/com/naruto/r2/GameMenu$1.smali').read_text()
+    if 'GameLoop;->resume' in menu or 'GameHooks;->resumeOriginalStats' not in menu:
+        raise AssertionError('FPS toggle can reactivate the added JNI worker')
     for name in ['smali/a/l0.smali', 'smali/a/g0.smali']:
         before = methods((reference / name).read_text())
         after = methods((decoded / name).read_text())

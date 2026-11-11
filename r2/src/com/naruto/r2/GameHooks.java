@@ -37,6 +37,11 @@ public final class GameHooks {
         if(returnToLauncher){returnToLauncher=false;a.startActivity(new Intent(a,com.naruto.port.LauncherActivity.class).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK|Intent.FLAG_ACTIVITY_CLEAR_TOP|Intent.FLAG_ACTIVITY_SINGLE_TOP));}
     }
     public static void refreshPrefs(Activity a){a.getSharedPreferences("naruto",4).getAll();}
+    /** Compatibility builds keep the original UI-thread dispatcher after an FPS toggle. */
+    public static void resumeOriginalStats(com.naruto.port.NarutoActivity a){
+        a.statsHandler.removeCallbacks(a.statsUpdater);
+        if(!a.isFinishing()&&!a.isDestroyed())a.statsHandler.post(a.statsUpdater);
+    }
     public static void gameReady(final Activity a){
         if(a.isFinishing())return;
         if(a instanceof com.naruto.port.NarutoActivity){GameMenu.applyTouch((com.naruto.port.NarutoActivity)a);StartupFeedback.begin((com.naruto.port.NarutoActivity)a);SessionDetails.start((com.naruto.port.NarutoActivity)a);}
