@@ -181,11 +181,22 @@ public final class R2Instrumentation extends Instrumentation {
 
     }
     private android.graphics.Bitmap region(View view) {
-        waitForIdleSync(); SystemClock.sleep(100);
+        // An idle message queue does not guarantee that the new frame was committed.
+        java.util.concurrent.CountDownLatch committed=new java.util.concurrent.CountDownLatch(1);
+        runOnMainSync(()->{view.getViewTreeObserver().registerFrameCommitCallback(committed::countDown);view.invalidate();});
+        try{check(committed.await(10,java.util.concurrent.TimeUnit.SECONDS),"Screenshot frame was committed");}
+        catch(InterruptedException error){Thread.currentThread().interrupt();throw new AssertionError(error);}
+        waitForIdleSync();
         final int[] xy=new int[2]; runOnMainSync(()->view.getLocationOnScreen(xy));
         android.graphics.Bitmap screen=getUiAutomation().takeScreenshot();
         android.graphics.Bitmap result=android.graphics.Bitmap.createBitmap(screen,xy[0],xy[1],view.getWidth(),view.getHeight());
         if(result!=screen)screen.recycle(); return result;
+    }
+    private void saveCapture(Context context,String name,android.graphics.Bitmap image)throws Exception {
+        File file=new File(context.getExternalFilesDir(null),"r2-tests-"+name+".preview.jpg");
+        android.graphics.Bitmap preview=android.graphics.Bitmap.createScaledBitmap(image,640,Math.max(1,image.getHeight()*640/image.getWidth()),true);
+        try(java.io.FileOutputStream out=new java.io.FileOutputStream(file)){preview.compress(android.graphics.Bitmap.CompressFormat.JPEG,85,out);}
+        if(preview!=image)preview.recycle();
     }
     private boolean samePixels(android.graphics.Bitmap left,android.graphics.Bitmap right) {
         if(left.getWidth()!=right.getWidth()||left.getHeight()!=right.getHeight())return false;
@@ -221,7 +232,9 @@ public final class R2Instrumentation extends Instrumentation {
                 android.graphics.Bitmap original=region(touchView[0]);
                 runOnMainSync(()->{try{enabled.setBoolean(state,true);touchView[0].invalidate();}catch(Throwable e){error[0]=e;}});
                 android.graphics.Bitmap cached=region(touchView[0]);
-                check(samePixels(original,cached),"Cached stock touch artwork matches original rendering, button mask "+mask);original.recycle();cached.recycle();
+                boolean same=samePixels(original,cached);
+                if(!same){saveCapture(context,"touch-stock",original);saveCapture(context,"touch-cached",cached);}
+                check(same,"Cached stock touch artwork matches original rendering, button mask "+mask);original.recycle();cached.recycle();
             }
             Object[] compactButtons=(Object[])touchClass.getField("a").get(touchView[0]);boolean[] hidden=new boolean[compactButtons.length];
             Object compact=compactButtons[0];float previousX=compact.getClass().getField("j").getFloat(compact);

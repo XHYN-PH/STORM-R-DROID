@@ -21,6 +21,8 @@ public final class TouchRender {
         long visual;
         boolean hasVisual;
         public boolean enabled = true;
+        boolean hasButtonMask;
+        int buttonMask;
         public int recordings, hits;
         public int stickRecordings,stickHits;
         public float layerArea,originalLayerArea;
@@ -78,6 +80,13 @@ public final class TouchRender {
         if (!state.enabled || view.o || !canvas.isHardwareAccelerated() || view.getWidth() <= 0 || view.getHeight() <= 0) {
             view.r2DrawButton(canvas, button, pressed);
             return;
+        }
+        // The stock button renderer shares mutable paints between buttons.
+        // Re-record in stock order when the overall pressed state changes.
+        int mask=view.D|view.c|view.d;
+        if(!state.hasButtonMask||state.buttonMask!=mask) {
+            for(Entry saved:state.entries)if(saved!=null)saved.discard();
+            state.buttonMask=mask;state.hasButtonMask=true;
         }
         Entry entry = null;
         for (int i = 0; i < view.a.length; i++) if (view.a[i] == button && i < state.entries.length) {

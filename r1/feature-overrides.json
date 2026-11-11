@@ -28,5 +28,11 @@
     "old": "    iget-object v0, v1, Lcom/naruto/port/LauncherActivity;->c:Landroid/content/SharedPreferences;\n\n    const-string v8, \"menu_ptbr\"\n\n    invoke-interface {v0, v8, v2}, Landroid/content/SharedPreferences;->getBoolean(Ljava/lang/String;Z)Z\n\n    move-result v0\n\n    if-eqz v0, :cond_3\n\n    const-string v0, \"pt\"\n\n    goto :goto_3\n\n    :cond_3\n    const-string v0, \"en\"\n\n    :goto_3\n",
     "new": "    const-string v0, \"en\"\n\n",
     "reason": "Always write English; remove the former PT-BR preference from the configuration writer."
+  },
+  {
+    "file": "smali/a/d.smali",
+    "old": "    const-string v10, \"-arm64.apk\"\n\n    invoke-virtual {v15, v10}, Ljava/lang/String;->endsWith(Ljava/lang/String;)Z\n\n    move-result v10\n\n    if-eqz v10, :cond_3",
+    "new": "    const-string v10, \"STORM R.apk\"\n\n    invoke-virtual {v15, v10}, Ljava/lang/String;->equals(Ljava/lang/Object;)Z\n\n    move-result v10\n\n    if-nez v10, :r1_valid_apk_asset\n\n    const-string v10, \"STORM.R.apk\"\n\n    invoke-virtual {v15, v10}, Ljava/lang/String;->equals(Ljava/lang/Object;)Z\n\n    move-result v10\n\n    if-nez v10, :r1_valid_apk_asset\n\n    const-string v10, \"-arm64.apk\"\n\n    invoke-virtual {v15, v10}, Ljava/lang/String;->endsWith(Ljava/lang/String;)Z\n\n    move-result v10\n\n    if-eqz v10, :cond_3\n\n    :r1_valid_apk_asset",
+    "reason": "Recognize the requested STORM R.apk filename while preserving legacy ARM64 release names."
   }
 ]

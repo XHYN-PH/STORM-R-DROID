@@ -97,7 +97,7 @@ jobs:
           timeout --kill-after=10 600 "$ANDROID_HOME/platform-tools/adb" shell am instrument -w -r com.naruto.storm4.r2tests/com.naruto.r2tests.R2Instrumentation | tee "$RUNNER_TEMP/r1-results/android-instrumentation.txt"
           timeout --kill-after=5 30 "$ANDROID_HOME/platform-tools/adb" root
           timeout --kill-after=5 30 "$ANDROID_HOME/platform-tools/adb" wait-for-device
-          for name in launcher controller display game-menu statistics closing; do
+          for name in launcher controller display game-menu statistics closing touch-stock touch-cached; do
             timeout --kill-after=5 30 "$ANDROID_HOME/platform-tools/adb" pull "/sdcard/Android/data/com.naruto.storm4/files/r2-tests-$name.png" "$RUNNER_TEMP/r1-results/$name.png" || true
             timeout --kill-after=5 30 "$ANDROID_HOME/platform-tools/adb" pull "/sdcard/Android/data/com.naruto.storm4/files/r2-tests-$name.preview.jpg" "$RUNNER_TEMP/r1-results/$name.preview.jpg" || true
           done
@@ -187,6 +187,19 @@ jobs:
               encoded=base64.b64encode(path.read_bytes()).decode()
               parts=[encoded[i:i+10000] for i in range(0,len(encoded),10000)]
               for index,part in enumerate(parts,1):print(f'::notice title=R2 preview closing {index:02d}/{len(parts):02d}::'+part)
+          PY
+      - name: Preview failed touch comparison
+        if: failure()
+        run: |
+          python3 - <<'PY'
+          import os,base64
+          from pathlib import Path
+          for name in ['touch-stock','touch-cached']:
+              path=Path(os.environ['RUNNER_TEMP'])/'r1-results'/(name+'.preview.jpg')
+              if not path.exists(): continue
+              encoded=base64.b64encode(path.read_bytes()).decode()
+              parts=[encoded[i:i+10000] for i in range(0,len(encoded),10000)]
+              for index,part in enumerate(parts,1):print(f'::notice title=R2 preview {name} {index:02d}/{len(parts):02d}::'+part)
           PY
       - name: Retain validation reports, not the temporary signing key/APKs
         if: always()

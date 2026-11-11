@@ -66,6 +66,8 @@ def verify(original, decoded, version_name="R1", version_code=122):
     require('"https://youtube.com/@xhyn_ph"' in combined,'Incorrect YouTube URL')
     require('https://api.github.com/repos/Masterllgod/' not in combined,'Updater still points at upstream')
     require('\"XHYN-PH/\"' in combined and '\"STORM-R-DROID\"' in combined and '\"Masterllgod/\"' not in combined,'Updater not pointed at fork')
+    updater=(smali/'a/d.smali').read_text()
+    require('"STORM R.apk"' in updater and '"-arm64.apk"' in updater,'Updater does not recognize the release APK filename')
     require('ViewPropertyAnimator;->scaleX' in method(launcher,'.method public static k(Landroid/view/View;)V'),'Card bounce removed')
     require('ViewPropertyAnimator;->scaleX' in (smali/'a/e.smali').read_text(),'Press animation removed')
     effect=method((smali/'a/C.smali').read_text(),'.method public final e(IFF)V')
