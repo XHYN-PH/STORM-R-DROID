@@ -19,7 +19,7 @@ public final class LauncherUi {
         LinearLayout root=null;
         if(!a.v.isEmpty()){
             View v=(View)a.v.get(0);
-            while(v.getParent() instanceof View){View parent=(View)v.getParent();if((parent instanceof ScrollView||parent.getClass().getName().equals("a.i"))&&v instanceof LinearLayout){root=(LinearLayout)v;break;}v=parent;}
+            while(v.getParent() instanceof View){View parent=(View)v.getParent();if((parent instanceof ScrollView||parent.getClass().getName().equals("a.f"))&&v instanceof LinearLayout){root=(LinearLayout)v;break;}v=parent;}
         }
         if(root==null)throw new IllegalStateException("Stock settings container was not found.");
         add(a,root,a.w("More options",buttons(a,new String[]{"Display","Saves","Tools"},new Runnable[]{()->display(a),()->saves(a),()->tools(a)})));
