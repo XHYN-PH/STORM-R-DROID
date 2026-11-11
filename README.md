@@ -7,7 +7,7 @@
 
 An English Android edition of the STORM R native port, with refined menus, save tools and a smaller, adjustable FPS panel.
 
-[**APK releases**](https://github.com/XHYN-PH/STORM-R-DROID/releases) · [**Telegram**](https://t.me/xhynports) · [**YouTube**](https://youtube.com/@xhyn_ph) · [**R1 changes**](CHANGELOG_R1.md)
+[**Download the latest APK**](https://github.com/XHYN-PH/STORM-R-DROID/releases/latest) · [**Telegram**](https://t.me/xhynports) · [**YouTube**](https://youtube.com/@xhyn_ph) · [**R1 changes**](CHANGELOG_R1.md)
 
 </div>
 
@@ -43,7 +43,7 @@ The original Revolution launcher layout, touch controls, controller mapping scre
 
 ## Install or update
 
-1. Check [APK releases](https://github.com/XHYN-PH/STORM-R-DROID/releases). When R1 is published, its APK is named **STORM R.apk**.
+1. Open the [latest release](https://github.com/XHYN-PH/STORM-R-DROID/releases/latest) and download **STORM.R.apk**.
 2. Install the APK. Future releases signed with the same XHYN_PH key can update this edition without uninstalling it.
 3. Open **STORM R** and grant file access when requested.
 4. Select the extracted game folder containing `default.xex`, choose your settings, then tap **Play**.
