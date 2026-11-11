@@ -130,7 +130,7 @@ jobs:
           path=Path(os.environ['RUNNER_TEMP'])/'r1-results/launcher.preview.jpg'
           if path.exists():
               encoded=base64.b64encode(path.read_bytes()).decode()
-              parts=[encoded[i:i+10000] for i in range(0,len(encoded),10000)]
+              parts=[encoded[i:i+4000] for i in range(0,len(encoded),4000)]
               for index,part in enumerate(parts,1):print(f'::notice title=R2 preview launcher {index:02d}/{len(parts):02d}::'+part)
           PY
       - name: Preview controller screen
@@ -141,7 +141,7 @@ jobs:
           path=Path(os.environ['RUNNER_TEMP'])/'r1-results/controller.preview.jpg'
           if path.exists():
               encoded=base64.b64encode(path.read_bytes()).decode()
-              parts=[encoded[i:i+10000] for i in range(0,len(encoded),10000)]
+              parts=[encoded[i:i+4000] for i in range(0,len(encoded),4000)]
               for index,part in enumerate(parts,1):print(f'::notice title=R2 preview controller {index:02d}/{len(parts):02d}::'+part)
           PY
       - name: Preview display screen
@@ -152,7 +152,7 @@ jobs:
           path=Path(os.environ['RUNNER_TEMP'])/'r1-results/display.preview.jpg'
           if path.exists():
               encoded=base64.b64encode(path.read_bytes()).decode()
-              parts=[encoded[i:i+10000] for i in range(0,len(encoded),10000)]
+              parts=[encoded[i:i+4000] for i in range(0,len(encoded),4000)]
               for index,part in enumerate(parts,1):print(f'::notice title=R2 preview display {index:02d}/{len(parts):02d}::'+part)
           PY
       - name: Preview game-menu screen
@@ -163,7 +163,7 @@ jobs:
           path=Path(os.environ['RUNNER_TEMP'])/'r1-results/game-menu.preview.jpg'
           if path.exists():
               encoded=base64.b64encode(path.read_bytes()).decode()
-              parts=[encoded[i:i+10000] for i in range(0,len(encoded),10000)]
+              parts=[encoded[i:i+4000] for i in range(0,len(encoded),4000)]
               for index,part in enumerate(parts,1):print(f'::notice title=R2 preview game-menu {index:02d}/{len(parts):02d}::'+part)
           PY
       - name: Preview statistics screen
@@ -174,7 +174,7 @@ jobs:
           path=Path(os.environ['RUNNER_TEMP'])/'r1-results/statistics.preview.jpg'
           if path.exists():
               encoded=base64.b64encode(path.read_bytes()).decode()
-              parts=[encoded[i:i+10000] for i in range(0,len(encoded),10000)]
+              parts=[encoded[i:i+4000] for i in range(0,len(encoded),4000)]
               for index,part in enumerate(parts,1):print(f'::notice title=R2 preview statistics {index:02d}/{len(parts):02d}::'+part)
           PY
       - name: Preview closing screen
@@ -185,7 +185,7 @@ jobs:
           path=Path(os.environ['RUNNER_TEMP'])/'r1-results/closing.preview.jpg'
           if path.exists():
               encoded=base64.b64encode(path.read_bytes()).decode()
-              parts=[encoded[i:i+10000] for i in range(0,len(encoded),10000)]
+              parts=[encoded[i:i+4000] for i in range(0,len(encoded),4000)]
               for index,part in enumerate(parts,1):print(f'::notice title=R2 preview closing {index:02d}/{len(parts):02d}::'+part)
           PY
       - name: Preview failed touch comparison
@@ -198,7 +198,7 @@ jobs:
               path=Path(os.environ['RUNNER_TEMP'])/'r1-results'/(name+'.preview.jpg')
               if not path.exists(): continue
               encoded=base64.b64encode(path.read_bytes()).decode()
-              parts=[encoded[i:i+10000] for i in range(0,len(encoded),10000)]
+              parts=[encoded[i:i+4000] for i in range(0,len(encoded),4000)]
               for index,part in enumerate(parts,1):print(f'::notice title=R2 preview {name} {index:02d}/{len(parts):02d}::'+part)
           PY
       - name: Retain validation reports, not the temporary signing key/APKs

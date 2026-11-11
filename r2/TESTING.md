@@ -12,7 +12,13 @@ The build is pinned to Revolution v1.1.11. Check results belong to this reposito
 
 The Android workflow builds an ephemeral test APK and runs launcher, mapping, save ZIP reimport, game menu, overlay sizing/collapse/rendering, closing-state, driver selection and logging tests at font scales 1.0 and 1.3. A separate startup smoke test opens the actual Revolution game activity and checks SDL main and the missing-game-file boundary. No game data is downloaded for CI.
 
-Android results are pending until a run for this repository completes. CI tests cannot prove gameplay performance, physical controller behavior, native save completion or PanVK/RADV gameplay compatibility on a phone.
+[Android validation run 43056432875](https://github.com/XHYN-PH/STORM-R-DROID/actions/runs/43056432875) passed against runtime source `8919e3c8a95a9217c0efd46f4dd04ff35c64e04a` on Android 11 with ARM translation at font scales **1.0 and 1.3**, with **137 instrumentation assertions per run**. Both actual Revolution game-activity smoke tests reached SDL main and the expected missing-game-file dialog with the game process alive. Session version/display metadata was also checked.
+
+The run covers the installed name/circular icon, original Send log/footer, settings layout, driver imports and configuration, save ZIP reimport/restore and 100% protection, cached pressed/unpressed controls, compact-layout alpha bounds, moving-stick artwork, statistics, game menu, shutdown coordination, logging JNI and stock controller mappings. The pressed-state cache was corrected before this passing run. Screenshot comparisons wait for a committed hardware frame and retain the existing pixel tolerance.
+
+Full screenshots are retained as workflow artifacts. Long inline preview chunks from this run were truncated by GitHub annotations and cannot establish visual correctness; they were not used as evidence of a successful visual review. Future preview output uses 4000-character chunks to fit the annotation limit.
+
+CI tests cannot prove gameplay performance, physical controller behavior, native save completion or PanVK/RADV gameplay compatibility on a phone.
 
 ## Assembly
 
