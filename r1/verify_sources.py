@@ -53,6 +53,10 @@ def verify(original, decoded, version_name="R1", version_code=122):
         old_notices=old_notices.replace('(O linkernsbypass, parte da libadrenotools, tem a mesma licença e o mesmo autor.)',
                                       '(linkernsbypass, part of libadrenotools, has the same license and author.)')
         require(old_notices==new_notices,'Changed license text or copyright notice')
+    public=ET.parse(decoded/'res/values/public.xml').getroot()
+    declared_styles={element.get('name') for element in public if element.get('type')=='style'}
+    defined_styles={element.get('name') for file in (decoded/'res/values').glob('*.xml') for element in ET.parse(file).getroot() if element.tag=='style'}
+    require(declared_styles<=defined_styles,'Missing original public style resource')
     smali=decoded/'smali'
     launcher=(smali/'com/naruto/port/LauncherActivity.smali').read_text()
     require('"menu_ptbr"' not in launcher,'PT-BR control still reachable')
