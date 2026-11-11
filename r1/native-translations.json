@@ -1,0 +1,10 @@
+{
+  "CPU jogo %.0f%% (%.0f%% de %ld nucleos)": "Game CPU %.0f%% (%.0f%% of %ld cores)",
+  "O jogo encontrou um erro e vai fechar.": "The game hit an error and will close.",
+  "A pasta do jogo não tem o default.xex:": "Game folder is missing default.xex:",
+  "suportado (shadowZero)": "supported (shadowZero)",
+  "Este celular nao e suportado: a GPU nao tem o que o renderizador precisa.": "Unsupported phone: GPU does not meet the renderer's requirements.",
+  "Volte ao menu e toque em ENVIAR LOG PARA O SHADOW.": "Return to the menu and tap SEND LOG TO SHADOW.",
+  "NAO SUPORTADO: a GPU nao tem buffer device address (Vulkan 1.2), que o shadowZero usa para ler as constantes dos shaders": "UNSUPPORTED: GPU lacks buffer device address (Vulkan 1.2), needed by shadowZero to read shader constants",
+  "NAO SUPORTADO: a GPU liga menos de 3 conjuntos de descritores": "UNSUPPORTED: GPU binds fewer than 3 descriptor sets"
+}

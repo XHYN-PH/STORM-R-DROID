@@ -1,177 +1,111 @@
 <div align="center">
+  <img src="docs/screenshots/icone.png" alt="STORM Revolution circular Naruto artwork" width="144">
 
-<img src="docs/screenshots/icone.png" alt="Ícone" width="128">
+# STORM R
 
-# 🌀 Naruto Shippuden: Ultimate Ninja Storm Revolution — Port Nativo
+**Modified and Translated by XHYN_PH**
 
-**O Storm Revolution de Xbox 360 rodando nativamente no Android (ARM64), sem emulador de CPU e com renderizador nativo.**
+An English Android edition of the STORM R native port, with refined menus, save tools and a smaller, adjustable FPS panel.
 
-![Android](https://img.shields.io/badge/Android-11%2B-3DDC84?logo=android&logoColor=white)
-![Arquitetura](https://img.shields.io/badge/arm64--v8a-64%20bits-orange)
-![Gráficos](https://img.shields.io/badge/Vulkan-shadowZero-AC162C?logo=vulkan&logoColor=white)
-![Estado](https://img.shields.io/badge/estado-em%20desenvolvimento-yellow)
-
-[Sobre](#-sobre) · [Download](#️-download) · [Recursos](#-o-que-o-port-oferece) · [Requisitos](#-requisitos) · [Versão do jogo](#-versão-do-jogo-obrigatória) · [Controles](#-controles) · [Perguntas](#-perguntas-frequentes)
+[**Download the latest APK**](https://github.com/XHYN-PH/STORM-R-DROID/releases/latest) · [**Telegram**](https://t.me/xhynports) · [**YouTube**](https://youtube.com/@xhyn_ph) · [**R1 changes**](CHANGELOG_R1.md)
 
 </div>
 
----
+## About this edition
 
-## 📖 Sobre
+STORM R is my modified English edition of the [original native port](https://github.com/Masterllgod/naruto-storm-revolution-port-nativo), based on Android **v1.1.11**. It runs native ARM64 code and renders through **Vulkan**.
 
-Este port **não é um emulador de Xbox 360**. O executável do jogo (`default.xex`) é **recompilado estaticamente** de PowerPC para ARM64: o resultado é código nativo, que roda direto no processador do celular.
+The focus is a cleaner interface, more useful Android options and less unnecessary work in the menus and overlays. Performance and compatibility still depend on the phone, driver and game scene.
 
-A parte gráfica usa o **shadowZero**, um renderizador nativo que pega os comandos Direct3D do jogo e desenha direto em Vulkan, sem emular a GPU do Xbox 360.
+## What changed from the original?
 
-Este app roda o **Storm Revolution original, sem mods**. O *Storm 4 MOD* tem app e repositório próprios: [naruto-storm-4-mod-port-nativo](https://github.com/Masterllgod/naruto-storm-4-mod-port-nativo). O *Storm Connections* também: [naruto-x-boruto-connections-port-nativo](https://github.com/Masterllgod/naruto-x-boruto-connections-port-nativo).
+| Feature | Original app | This edition |
+| --- | --- | --- |
+| Language | Portuguese launcher and settings | English launcher, settings, controls and messages |
+| App identity | Original name and icon | **STORM R** with the original circular Revolution artwork |
+| Menus and effects | Legacy dialogs and decorative particles | Rounded dark menus with gold accents; simple bounce and press feedback retained |
+| FPS/statistics panel | Fixed size | Smaller by default, adjustable from **50–125%**, with separate game/output FPS and a compact mode |
+| Save management | Save import | Import, export, backups and restoration safeguards |
+| Display choices | Fit and Stretch | Fit, Stretch and proportional Crop to fill the display |
+| In-game options | Basic display/control options | Touch visibility and opacity, brightness, panel size and confirmed return to launcher |
+| GPU driver imports | Qualcomm-only picker | Turnip for Adreno, plus experimental PanVK for compatible Mali and RADV for compatible Xclipse |
+| Logging | Regular app log capture | Optional **Logging**, off by default; original **Send log** retained with added session details |
 
-> [!IMPORTANT]
-> **Nada do jogo é distribuído aqui.** Você precisa da sua **própria cópia** de *Naruto Shippuden: Ultimate Ninja Storm Revolution* para Xbox 360, na versão indicada em [Versão do jogo](#-versão-do-jogo-obrigatória).
+The original Revolution launcher layout, touch controls, controller mapping screen and graphics controls are retained. Its existing PT-BR switch is replaced with Logging; game language is fixed to English. Interface refinements also reuse button artwork, collect statistics in the background and stop unnecessary polling when panels are hidden. See the [release history](#release-history) for changes in each version.
 
-> [!WARNING]
-> **Versão de testes.** O APK está na página de **[Releases](../../releases)**. Ainda pode travar ou ter falhas de imagem; relate nas *Issues* dizendo o aparelho e a resolução usada.
+## Requirements
 
-## ✨ O que o port oferece
+- **Android 11 or newer** on a **64-bit ARM device**, with Vulkan support.
+- Your own copy of **Naruto Shippuden: Ultimate Ninja Storm Revolution for Xbox 360, supported North American / NTSC-U version**.
+- The complete extracted game folder, containing the required `default.xex` and all game data.
 
-- Recompilação estática do jogo para **ARM64**, sem interpretador de CPU.
-- Renderizador nativo **shadowZero** (Direct3D → Vulkan), com escolha da resolução interna, **FSR** e **Nitidez**, e tela **16:9** ou **esticada**.
-- **30 FPS** (ou 20 / 24 para aliviar aparelhos mais fracos) e **modo desempenho**.
-- **"Preparando shaders"** antes do jogo começar, para não engasgar na primeira luta.
-- **Textos em português** (chave **PT-BR** no menu).
-- **Controles na tela** no formato do controle do Xbox, com atalhos de jutsu, jutsu secreto e avanço; editor para mover, redimensionar e ajustar a transparência.
-- **Dois controles físicos:** o primeiro é o jogador 1 e o segundo é o jogador 2; em **MAPEAR** dá para trocar os botões de cada um. Plugou um controle, os botões da tela somem.
-- **Shadow** pequeno no canto da tela com o menu do jogo: tela 16:9/esticar, mostrar FPS, editar botões, ocultar.
-- Menu inicial com o tema do **Pain** (chuva de Amegakure, Rinnegan, nuvens da Akatsuki).
-- **Save 100%** embutido, que guarda o seu save e o devolve ao desligar.
-- **Gerar quadros (AMD FG):** Off / 2x / 3x / 4x. O jogo roda a 30 FPS e a tela recebe 60, 90 ou 120 quadros por segundo. Modo **Desempenho** (leve, o mesmo do Storm 4 de PC) ou **Qualidade**, e **Tela (Hz)** Auto / 60 / 90 / 120. Feito sobre o fluxo óptico da AMD adaptado para celular (Mali, Adreno e Xclipse), sem arquivo externo.
-- **Sem congelamentos no ARM:** corrigido o anel de comandos da GPU que travava o jogo depois de alguns minutos (às vezes com o erro `0x0BADF00D`) em celulares e tablets.
-- **Android 11 e 12:** o app não fecha mais ao abrir com a internet ligada.
-- **Atualização automática:** ao abrir o menu, o app avisa quando sai versão nova aqui no GitHub e já baixa e instala.
-- **Drivers de GPU customizados (Turnip)** em celulares **Snapdragon**.
-- Painel de desempenho (FPS, resolução, CPU, GPU e RAM) e botão de enviar log.
+**Game files are not included in the APK or this repository.**
 
-## ⬇️ Download
+## Install or update
 
-O APK está na página de **[Releases](../../releases)**.
+1. Open the [latest release](https://github.com/XHYN-PH/STORM-R-DROID/releases/latest) and download **STORM-R-R1-arm64.apk**.
+2. Install the APK. Future releases signed with the same XHYN_PH key can update this edition without uninstalling it.
+3. Open **STORM R** and grant file access when requested.
+4. Select the extracted game folder containing `default.xex`, choose your settings, then tap **Play**.
 
-1. Instale o APK.
-2. Copie a pasta do jogo (com o `default.xex`) para o celular.
-3. Abra o app, toque no caminho da pasta embaixo do **JOGAR** para escolher a pasta do jogo e dê a permissão de acesso aos arquivos.
-4. Toque em **JOGAR**.
-
-A partir da v1.1.2, o app avisa ao abrir o menu quando sai versão nova aqui no GitHub e já baixa e instala.
-
-## 📱 Requisitos
-
-| | Mínimo | Recomendado |
-|---|---|---|
-| **Android** | 11 (API 30) | 13 ou mais novo |
-| **Processador** | ARM64 (arm64-v8a) | Snapdragon 7 Gen 1 / Dimensity 8000 ou superior |
-| **GPU** | Vulkan 1.1 com *buffer device address* | Mali-G710 / Adreno 730 ou superior |
-| **RAM** | 4 GB | 8 GB ou mais |
-| **Espaço** | espaço dos arquivos do jogo | — |
-
-**GPUs que funcionam:** Mali Valhall (G57, G68, G77, G78, G610, G710, G615, G720…), Adreno 6xx com Android 11 ou mais novo, Adreno 7xx e Xclipse. Em GPUs sem *buffer device address* (Mali antigas, Adreno 5xx, PowerVR) o menu mostra **"Celular não suportado"** e o botão de enviar o log.
-
-## 💿 Versão do jogo (obrigatória)
-
-O port é feito para **um executável específico**. O código é recompilado a partir dele, então o `default.xex` precisa ser **idêntico** (confira o hash).
-
-> [!TIP]
-> Use o disco **norte-americano (NTSC-U)** cujo `default.xex` tenha o hash abaixo. Disco europeu (PAL) ou japonês não serve.
-
-| Campo | Valor |
-|---|---|
-| Jogo | Naruto Shippuden: Ultimate Ninja Storm Revolution (Xbox 360) |
-| Title ID | `4E4D0868` |
-| Media ID | `29E320A9` |
-| Versão do executável | `0.0.0.4` |
-| Trava de região do executável | somente NTSC-U (América do Norte) |
-
-| Arquivo | Tamanho | SHA-1 | MD5 |
-|---|---|---|---|
-| `default.xex` | 11.776.000 bytes | `c9c1cf1fc4d7a535542edb1aae19751d4ed7e090` | `a66c3772f0b578c86b3dc7e043a05869` |
+This edition keeps the upstream Android package, `com.naruto.storm4`, and uses its own signing key. That package may also be used by other Revolution/Connections variants, so those installations can conflict. If Android reports a signing conflict with the original app or another build, **back up your saves before uninstalling it**.
 
 <details>
-<summary><b>Como conferir o hash</b></summary>
+<summary>Check the required game executable</summary>
 
-- **Windows (PowerShell):** `Get-FileHash default.xex -Algorithm SHA1`
-- **Linux / macOS:** `sha1sum default.xex`
-- **Android:** qualquer app de "hash checker" da Play Store.
+The port requires the exact supported `default.xex`. A different region or executable revision may not work, even if the game title matches.
+
+| File | Size | SHA-1 |
+| --- | --- | --- |
+| `default.xex` | 11,776,000 bytes | `c9c1cf1fc4d7a535542edb1aae19751d4ed7e090` |
+
+Copy the complete extracted disc folder; selecting an executable alone is not enough. See the [original project's game requirements](https://github.com/Masterllgod/naruto-storm-revolution-port-nativo#readme) for more details.
 
 </details>
 
-## 🎮 Controles
+## Useful options
 
-| Botão na tela | Controle | Ação no jogo |
-|---|---|---|
-| ATAQUE | B | ataque |
-| PULO | A | pulo |
-| FERRAMENTA | X | ferramenta ninja |
-| CHAKRA | Y | carregar chakra |
-| DEFESA | RT | defesa |
-| SUBSTITUIÇÃO | LT | substituição |
-| APOIO | LB / RB | personagens de apoio |
-| DESPERTAR | analógico direito para o lado | despertar (quando a barra permitir) |
-| JUTSU / OUGI / AVANÇO | Y B / Y Y B / Y A | atalhos de jutsu, jutsu secreto e avanço |
-| SELECT / START | Back / Start | menu e pausa |
+- **Resize the FPS panel:** open **More options → Display → FPS / statistics size**. The same control is available in **Game options**, where resizing applies immediately. The default is 70%; Reset restores it. Drag the panel to move it, or use its minus button to collapse it.
+- **Read the FPS panel:** **Game** is the game's frame rate; **Output** includes frame generation. Higher output FPS does not mean the game itself runs faster. `~` means an estimate. Compact mode uses **G** and **O** for the same two values.
+- **Open Game options:** tap the floating menu button during gameplay, or use Android Back.
+- **Return to the launcher:** wait for the game's save indicator to finish, then choose **Return to launcher** and confirm. Wait for **Closing game…** to finish before managing saves. Exiting does not create a manual save.
+- **Export or back up saves:** open **More options → Saves**. Export reads your current save without changing it. Backup restoration is blocked while the game is running or the bundled 100% save is active. The bundled STORM R 100% save is preserved.
+- **Fill the display:** **Fit** keeps the full image, **Stretch** changes its proportions, and **Crop** fills the display by cutting off edges while keeping proportions. Crop does not expand the game's camera view.
+- **Collect a log:** enable **Logging**, restart the game, reproduce the issue, then use the original **Send log** link. App and session details are attached automatically.
 
-O mapeamento de controles físicos pode ser mudado no menu, em **Controle → MAPEAR** (Controle 1 e Controle 2).
+## GPU drivers
 
-## ❓ Perguntas frequentes
+The phone's **system Vulkan driver** is available by default. To try a custom driver, open **GPU Driver → Change → Import driver** and choose a compatible Android Vulkan ZIP. Close the game and wait for shutdown to finish before importing or changing drivers. Changes apply on the next game launch.
 
-<details>
-<summary><b>Onde baixo?</b></summary>
+| Phone GPU | Custom driver option |
+| --- | --- |
+| Qualcomm Adreno | Compatible Turnip / AdrenoTools-format packages |
+| ARM Mali | **Experimental** PanVK imports for supported Mali families |
+| Samsung Xclipse | **Experimental** RADV Xclipse imports; the linked v1.8.0 package requires Android 14 or newer |
 
-Na página de **[Releases](../../releases)**. Veja as notas de cada versão.
+Drivers must match your GPU and Android version. PanVK and RADV Xclipse cannot replace Turnip on an Adreno phone. The linked FristOneRR PanVK 3.7.0 package excludes newer CSF/Immortalis GPUs.
 
-</details>
+Additional PanVK/RADV packages are downloaded separately. Successful import does not guarantee working gameplay; the Mali/Xclipse paths still need testing on real devices. See [driver requirements and downloads](r2/DRIVERS.md) for supported packages and restrictions.
 
-<details>
-<summary><b>E o Storm 4 MOD e o Modpack V8?</b></summary>
+## Updates and support
 
-O Storm 4 MOD agora tem app e repositório próprios: [naruto-storm-4-mod-port-nativo](https://github.com/Masterllgod/naruto-storm-4-mod-port-nativo). As versões antigas (até a v0.13) estão lá.
+- **[Telegram — @xhynports](https://t.me/xhynports)**
+- **[YouTube — @xhyn_ph](https://youtube.com/@xhyn_ph)**
+- **[GitHub releases](https://github.com/XHYN-PH/STORM-R-DROID/releases)** — APK downloads and release notes.
+- **[Report an issue](https://github.com/XHYN-PH/STORM-R-DROID/issues)** — describe what happened and how to reproduce it.
 
-</details>
+For bug reports, include your phone model, Android version, app version, GPU driver and the affected game mode or scene. If possible, attach a log collected using **Logging → restart game → reproduce issue → Send log**.
 
-<details>
-<summary><b>Funciona com outra versão ou região do disco?</b></summary>
+## Release history
 
-Só se o `default.xex` for **idêntico** (mesmo SHA-1 da tabela). Com hash diferente, não funciona.
+- [R1 — English interface, refined menus, save tools, display options and experimental driver imports](CHANGELOG_R1.md).
 
-</details>
+This edition brings the retained customizations developed for [STORM 3 R1–R2.4](https://github.com/XHYN-PH/STORM-3-DROID) to STORM R. It uses Revolution’s own engine, `STORMR.S` save format and bundled 100% save. STORM 2 and 3 saves are incompatible. The rumble/right-stick helpers, controller preview, performance history and added diagnostics exporter that were removed from STORM 3 are excluded here too. The stock controller mapping screen and original Send log remain.
 
-<details>
-<summary><b>O código-fonte está disponível?</b></summary>
+## Source code and limitations
 
-Este repositório traz só a documentação. Os componentes de código aberto usados (incluindo os de licença GPL-3.0 do renderizador nativo) estão listados abaixo, com as respectivas licenças.
+The original port's engine is **closed source**, and I do not have access to its source code. This limits the bugs I can fix, the performance improvements I can make and the features I can add, especially inside the engine and renderer. Some crashes, graphical problems and compatibility issues require changes to that engine.
 
-</details>
+My customization code, translations, patches and build tools are published in this repository. They cover the launcher, interface, settings and Android integration; they are not the full engine source. See the [build instructions](r2/README.md).
 
-## 🙏 Créditos
-
-Este projeto só foi possível graças a estes projetos de código aberto:
-
-- [**XenonRecomp**](https://github.com/hedge-dev/XenonRecomp): recompilador estático de PowerPC (Xbox 360)
-- [**reNut**](https://github.com/masterspike52/reNut) e os ports [masseffect-nx](https://github.com/nebadasSwifty/masseffect-nx), [nfsmw-nx](https://github.com/StevensND/nfsmw-nx), banjo-nx e sa2-nx: base do renderizador nativo shadowZero
-- [**plume**](https://github.com/renderbag/plume) e [**XenosRecomp**](https://github.com/hedge-dev/XenosRecomp): camada Vulkan e tradução dos shaders do Xbox 360
-- [**Xenia Canary**](https://github.com/xenia-canary/xenia-canary): referência do hardware do Xbox 360
-- [**SDL 3**](https://github.com/libsdl-org/SDL): janela, entrada e áudio
-- [**FFmpeg**](https://ffmpeg.org): decodificação de áudio XMA
-- [**AMD FidelityFX FSR**](https://github.com/GPUOpen-Effects): escala
-- [**AMD FidelityFX SDK**](https://github.com/GPUOpen-LibrariesAndSDKs/FidelityFX-SDK) (MIT): fluxo óptico e interpolação da geração de quadros
-- [**libadrenotools**](https://github.com/bylaws/libadrenotools): drivers de GPU customizados no Android
-
-As licenças completas estão em [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md).
-
-## ⚖️ Aviso legal
-
-Este é um projeto de fãs, **sem fins lucrativos**, sem nenhuma ligação com a Bandai Namco, a CyberConnect2, a VIZ Media, Masashi Kishimoto ou a Microsoft. *Naruto* e *Naruto Shippuden: Ultimate Ninja Storm Revolution* são marcas e obras de seus respectivos donos.
-
-Os pacotes **não incluem** arquivos, vídeos, sons ou texturas do jogo: é preciso ter a sua própria cópia original. Não peça nem compartilhe arquivos do jogo nas issues.
-
----
-
-<div align="center">
-Feito com 🧡 por <a href="https://www.youtube.com/@Ll_Shadowll">SHADOWll</a>
-</div>
+Customization code is [MIT-licensed](r1/LICENSE). The original port and its components retain their existing authorship and licenses; see [Third-party notices](THIRD_PARTY_NOTICES.md). This is an unofficial modification, not an official game release.

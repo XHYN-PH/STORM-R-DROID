@@ -1,0 +1,8 @@
+[
+  {
+    "file": "smali/a/d.smali",
+    "old": "    move-result-object v7\n\n    new-instance v0, La/x0;",
+    "new": "    move-result-object v7\n\n    const-string v7, \"R1 changes and release notes are available at github.com/XHYN-PH/STORM-R-DROID. This update is provided by XHYN_PH.\"\n\n    new-instance v0, La/x0;",
+    "reason": "Replace upstream Portuguese release notes with an English notice; retain version checks and download flow."
+  }
+]

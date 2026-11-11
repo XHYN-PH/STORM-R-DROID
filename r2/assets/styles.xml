@@ -1,0 +1,30 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <style name="AppTheme" parent="@android:style/Theme.Material.NoActionBar">
+        <item name="android:windowFullscreen">true</item>
+        <item name="android:windowActionModeOverlay">true</item>
+        <item name="android:fontFamily">sans</item>
+        <item name="android:colorAccent">#E7B96B</item>
+        <item name="android:colorControlActivated">#E7B96B</item>
+        <item name="android:windowBackground">#0C1411</item>
+        <item name="android:colorBackground">#141C1A</item>
+        <item name="android:textColorPrimary">#F4F0E8</item>
+        <item name="android:textColorSecondary">#B6BCB8</item>
+        <item name="android:alertDialogTheme">@style/StormDialog</item>
+        <item name="android:popupMenuStyle">@style/StormPopup</item>
+        <item name="android:navigationBarColor">#000000</item>
+        <item name="android:windowLightNavigationBar">false</item>
+    </style>
+    <style name="StormDialog" parent="@android:style/Theme.Material.Dialog.Alert">
+        <item name="android:fontFamily">sans</item>
+        <item name="android:colorAccent">#E7B96B</item>
+        <item name="android:colorControlActivated">#E7B96B</item>
+        <item name="android:windowBackground">@drawable/dialog_panel</item>
+        <item name="android:colorBackground">#141C1A</item>
+        <item name="android:textColorPrimary">#F4F0E8</item>
+        <item name="android:textColorSecondary">#B6BCB8</item>
+    </style>
+    <style name="StormPopup" parent="@android:style/Widget.Material.PopupMenu">
+        <item name="android:popupBackground">@drawable/dialog_panel</item>
+    </style>
+</resources>

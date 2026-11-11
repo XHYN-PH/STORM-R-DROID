@@ -6,3 +6,14 @@
 *.zip
 private/
 ppc/
+
+__pycache__/
+dist/
+*.p12
+*.pass
+*.jks
+*.keystore
+
+.build/
+*.idsig
+translation-report.json
