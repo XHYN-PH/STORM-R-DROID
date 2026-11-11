@@ -51,6 +51,17 @@ for version,file in [('R2','R2-ci-only.apk')]:
         time.sleep(5)
         pid=assert_alive();log=read_log(version)
         assert 'Running main function SDL_main' in log,'The native SDL entry point did not start.'
+        if os.environ.get('STARTUP_TEST')=='true':
+            assert pid.isdigit(),'Unexpected game process identity'
+            maps=command('shell','cat',f'/proc/{pid}/maps')
+            assert 'librevolution.so' in maps,'The actual Revolution engine was not mapped.'
+            assert 'libxhynlog.so' not in maps,'Diagnostic game process loaded the native log-interception helper.'
+            tasks=command('shell','ls',f'/proc/{pid}/task').split()
+            names=[]
+            for task in tasks:
+                if task.isdigit():names.append(command('shell','cat',f'/proc/{pid}/task/{task}/comm',check=False).strip())
+            assert not any(name.startswith('STORM native st') for name in names),'Diagnostic game process started the added native-statistics worker.'
+            notice('Original startup profile','PASS: actual Revolution engine loaded; native log-interception library and added JNI worker absent from :game.')
         if version=='R2':
             hierarchy=dump_menu('R2-native-loader.xml')
             messages=[node.get('text','') for node in hierarchy.iter('node')]

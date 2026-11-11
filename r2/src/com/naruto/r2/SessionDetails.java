@@ -40,7 +40,7 @@ public final class SessionDetails {
         SharedPreferences p=GameHooks.prefs(c);
         String driverLabel=DriverSupport.selectedLabel(c);
         return "App: STORM R "+version(c)+"\nAndroid: "+clean(Build.VERSION.RELEASE)+" (API "+Build.VERSION.SDK_INT+")\nDevice: "+clean(Build.MANUFACTURER)+" "+clean(Build.MODEL)
-            +"\nResolution selected: "+choice(p,"menu_resolution_v5",1,"360p","480p","540p","720p","900p","1080p","2K","4K")
+            +"\nResolution selected: "+choice(p,"menu_resolution_v4",1,"360p","480p","540p","720p","1080p","2K","4K")
             +"\nAntialiasing selected: "+choice(p,"menu_antialiasing",0,"Off","FXAA","FXAA+")
             +"\nScaling selected: "+choice(p,"menu_upscaling",0,"Normal","FSR")
             +"\nGame FPS selected: "+choice(p,"menu_fps",2,"20","24","30")

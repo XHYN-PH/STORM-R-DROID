@@ -3,6 +3,11 @@ on:
   push:
     paths: ['r2/**/*.java', 'r2/**/*.py', 'r2/assets/*', 'r2/native/**', 'r2/tests/android/AndroidManifest.xml', 'r1/**/*.py', 'r1/**/*.c', 'r1/**/*.smali', 'r1/**/*.json', 'r1/tests/android/AndroidManifest.xml', '.github/workflows/android.yml']
   workflow_dispatch:
+    inputs:
+      startup_test:
+        description: Validate the original-startup compatibility diagnostic
+        type: boolean
+        default: false
 concurrency:
   group: r2-android-${{ github.ref }}
   cancel-in-progress: true
@@ -11,6 +16,8 @@ permissions:
 jobs:
   android-11:
     runs-on: ubuntu-24.04
+    env:
+      STARTUP_TEST: ${{ inputs.startup_test || github.ref == 'refs/heads/fix/revolution-startup' }}
     timeout-minutes: 45
     strategy:
       fail-fast: false
@@ -37,7 +44,9 @@ jobs:
           printf 'android\n' > "$RUNNER_TEMP/r1-tools/test.pass"
           keytool -genkeypair -alias xhyn-r1 -keyalg RSA -keysize 2048 -validity 2 -storetype PKCS12 -keystore "$RUNNER_TEMP/r1-tools/test.p12" -storepass:file "$RUNNER_TEMP/r1-tools/test.pass" -dname 'CN=XHYN_PH CI Test Only'
           python3 r2/preflight.py --android-jar "$ANDROID_HOME/platforms/android-30/android.jar" --upstream "$RUNNER_TEMP/r1-tools/upstream.apk" --apktool "$RUNNER_TEMP/r1-tools/apktool.jar" --build-tools "$ANDROID_HOME/build-tools/35.0.0"
-          python3 r1/build_r1.py --r2 --android-jar "$ANDROID_HOME/platforms/android-30/android.jar" --upstream "$RUNNER_TEMP/r1-tools/upstream.apk" --apktool "$RUNNER_TEMP/r1-tools/apktool.jar" --ndk "$ANDROID_HOME/ndk/28.2.13676358" --build-tools "$ANDROID_HOME/build-tools/35.0.0" --keystore "$RUNNER_TEMP/r1-tools/test.p12" --password-file "$RUNNER_TEMP/r1-tools/test.pass" --output "$RUNNER_TEMP/r1-results/R2-ci-only.apk"
+          startup_flags=()
+          if [ "$STARTUP_TEST" = true ]; then startup_flags+=(--startup-test); fi
+          python3 r1/build_r1.py --r2 "${startup_flags[@]}" --android-jar "$ANDROID_HOME/platforms/android-30/android.jar" --upstream "$RUNNER_TEMP/r1-tools/upstream.apk" --apktool "$RUNNER_TEMP/r1-tools/apktool.jar" --ndk "$ANDROID_HOME/ndk/28.2.13676358" --build-tools "$ANDROID_HOME/build-tools/35.0.0" --keystore "$RUNNER_TEMP/r1-tools/test.p12" --password-file "$RUNNER_TEMP/r1-tools/test.pass" --output "$RUNNER_TEMP/r1-results/R2-ci-only.apk"
           python3 r2/tests/android/build_tests.py --android-jar "$ANDROID_HOME/platforms/android-30/android.jar" --build-tools "$ANDROID_HOME/build-tools/35.0.0" --keystore "$RUNNER_TEMP/r1-tools/test.p12" --password-file "$RUNNER_TEMP/r1-tools/test.pass" --output "$RUNNER_TEMP/r1-tools/R2-tests.apk"
       - name: Start hardware-accelerated Android 11 with ARM translation
         run: |
@@ -113,10 +122,13 @@ jobs:
               raise SystemExit(1)
           assert 'R2_ANDROID_RESULT=FAIL' not in result, result
           markers=(root/'logging-markers.txt').read_text()
-          for kind in ('LOGGING', 'STACK', 'STDERR'):
-              assert 'R1_'+kind+'_ON_MARKER' in markers, markers
-              assert 'R1_'+kind+'_OFF_MARKER' not in markers, markers
-          print('PASS: Android instrumentation and real app logcat On/Off markers')
+          if os.environ.get('STARTUP_TEST')!='true':
+              for kind in ('LOGGING', 'STACK', 'STDERR'):
+                  assert 'R1_'+kind+'_ON_MARKER' in markers, markers
+                  assert 'R1_'+kind+'_OFF_MARKER' not in markers, markers
+              print('PASS: Android instrumentation and real app logcat On/Off markers')
+          else:
+              print('PASS: compatibility UI/save/menu checks; game-native log interception intentionally bypassed')
           import re
           print('::notice title=R2 Android result::'+re.search(r'R2_ANDROID_RESULT=PASS assertions=\d+',result).group())
           PY

@@ -317,6 +317,19 @@ public final class R2Instrumentation extends Instrumentation {
     }
     private void testSessionDetailsAndClosing(Context context,ClassLoader loader)throws Exception {
         Class<?> details=Class.forName("com.naruto.r2.SessionDetails",true,loader),exit=Class.forName("com.naruto.r2.ExitFeedback",true,loader);
+        SharedPreferences resolutionPrefs=context.getSharedPreferences("naruto",0);
+        boolean hadResolution=resolutionPrefs.contains("menu_resolution_v4"),hadLegacyResolution=resolutionPrefs.contains("menu_resolution_v5");
+        int oldResolution=resolutionPrefs.getInt("menu_resolution_v4",1),oldLegacyResolution=resolutionPrefs.getInt("menu_resolution_v5",1);
+        try {
+            resolutionPrefs.edit().putInt("menu_resolution_v4",4).putInt("menu_resolution_v5",0).commit();
+            Method selectedResolution=details.getDeclaredMethod("selected",Context.class);selectedResolution.setAccessible(true);
+            check(((String)selectedResolution.invoke(null,launcher)).contains("Resolution selected: 1080p\n"),"Log resolution matches Revolution's 1080p selection despite a legacy setting");
+        } finally {
+            SharedPreferences.Editor restore=resolutionPrefs.edit();
+            if(hadResolution)restore.putInt("menu_resolution_v4",oldResolution);else restore.remove("menu_resolution_v4");
+            if(hadLegacyResolution)restore.putInt("menu_resolution_v5",oldLegacyResolution);else restore.remove("menu_resolution_v5");
+            restore.commit();
+        }
         File external=context.getExternalFilesDir(null),privateFile=new File(context.getFilesDir(),"r2-last-session.txt"),log=new File(external,"naruto.log"),gpu=new File(external,"gpu_info.txt"),shared=new File(external,"session-details.txt");
         File[] files={privateFile,log,gpu,shared};byte[][] previous=new byte[files.length][];
         for(int i=0;i<files.length;i++)if(files[i].isFile())previous[i]=java.nio.file.Files.readAllBytes(files[i].toPath());
@@ -446,6 +459,26 @@ public final class R2Instrumentation extends Instrumentation {
             if(failure[0]!=null)throw new RuntimeException(failure[0]);
         }finally{release.countDown();runOnMainSync(()->{try{samples.getMethod("destroy",game).invoke(null,instance[0]);startup.getMethod("destroy",game).invoke(null,instance[0]);}catch(Exception e){throw new RuntimeException(e);}});source.set(null,original);}
     }
+    private void testStartupCompatibility(Context context,ClassLoader loader)throws Exception {
+        check(context.getPackageManager().getPackageInfo(context.getPackageName(),0).getLongVersionCode()==122,"Compatibility test permits reinstalling R1 without a version downgrade");
+        try(java.io.InputStream input=context.getAssets().open("startup-test.txt")){
+            ByteArrayOutputStream bytes=new ByteArrayOutputStream();byte[] buffer=new byte[1024];int count;
+            while((count=input.read(buffer))!=-1)bytes.write(buffer,0,count);
+            check(bytes.toString("UTF-8").contains("original-startup compatibility test"),"Compatibility build is explicitly identified as a test");
+        }
+        Intent intent=new Intent();intent.setClassName(context.getPackageName(),"com.naruto.port.LauncherActivity");intent.putExtra("trailer",false);intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+        launcher=startActivitySync(intent);waitForIdleSync();
+        List<View> views=new ArrayList<>();runOnMainSync(()->collect(launcher.getWindow().getDecorView(),views));
+        check("STORM R".contentEquals(context.getApplicationInfo().loadLabel(context.getPackageManager())),"Compatibility build keeps STORM R branding");
+        check(hasText(views,"Logging")&&hasText(views,"More options"),"English launcher options remain available");
+        View send=named(views,"Send log");check(send!=null&&send.hasOnClickListeners(),"Stock Send log remains connected");
+        check(hasText(views,"Modified and Translated by XHYN_PH")&&!hasText(views,"PT-BR"),"English footer and language policy are retained");
+        screenshot(context,"launcher");
+        testSessionDetailsAndClosing(context,loader);
+        testSaveFiles(context,loader);
+        testModernMenu(context,loader);
+        testController(context,loader);
+    }
     @Override public void onStart() {
         Thread watchdog=new Thread(()->{try{Thread.sleep(120000);}catch(InterruptedException done){return;}if(completed)return;StringBuilder trace=new StringBuilder();for(java.util.Map.Entry<Thread,StackTraceElement[]> entry:Thread.getAllStackTraces().entrySet())if(entry.getKey().getName().equals("main")||entry.getKey().getName().contains("Instr")){trace.append(entry.getKey().getName()).append('\n');int n=0;for(StackTraceElement frame:entry.getValue()){trace.append(frame).append('\n');if(++n==12)break;}}Bundle status=new Bundle();status.putString("stream",trace+"R2_STALL_STAGE="+lastProgress+"\n");sendStatus(1,status);},"R2-watchdog");watchdog.setDaemon(true);watchdog.start();
         Bundle result=new Bundle(); Context context=getTargetContext();
@@ -453,6 +486,13 @@ public final class R2Instrumentation extends Instrumentation {
         boolean originalLogging=prefs.getBoolean("logging_enabled",false);
         boolean originalPt=prefs.getBoolean("menu_ptbr",false);
         try {
+            String version=context.getPackageManager().getPackageInfo(context.getPackageName(),0).versionName;
+            if("R1-startup-test1".equals(version)){
+                testStartupCompatibility(context,context.getClassLoader());
+                result.putString("r1_result","PASS");result.putInt("assertions",assertions);
+                result.putString("stream","R2_ANDROID_RESULT=PASS assertions="+assertions+" profile=original-startup\n");
+                finish(Activity.RESULT_OK,result);return;
+            }
             check("R1".equals(context.getPackageManager().getPackageInfo(context.getPackageName(),0).versionName),"Installed version is R1");
             check(!originalLogging,"Logging defaults to off on a fresh install");
             ClassLoader loader=context.getClassLoader();
