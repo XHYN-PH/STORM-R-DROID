@@ -44,13 +44,18 @@ public final class R2Instrumentation extends Instrumentation {
             for (int i=0; i<group.getChildCount(); i++) collect(group.getChildAt(i), views);
         }
     }
+    private boolean matchesText(String expected, CharSequence actual) {
+        // Revolution decorates stock headings with a diamond and uppercase text.
+        String label=actual.toString().replaceFirst("^\u25c6\\s*", "").trim();
+        return expected.equalsIgnoreCase(label);
+    }
     private boolean hasText(List<View> views, String text) {
-        for (View view: views) if (view instanceof TextView && text.contentEquals(((TextView)view).getText())) return true;
+        for (View view: views) if (view instanceof TextView && matchesText(text,((TextView)view).getText())) return true;
         return false;
     }
     private View findLoggingSwitch(List<View> views) {
         for (View view: views) {
-            if (!(view instanceof TextView) || !"Logging".contentEquals(((TextView)view).getText())) continue;
+            if (!(view instanceof TextView) || !matchesText("Logging",((TextView)view).getText())) continue;
             View current=view;
             while (current.getParent() instanceof ViewGroup) {
                 current=(View)current.getParent();
@@ -155,7 +160,7 @@ public final class R2Instrumentation extends Instrumentation {
         finally{finishEngine.countDown();threadField.set(null,previousThread);if(lock.isValid())lock.release();file.close();lockField.set(null,null);fileField.set(null,null);lockPath.delete();hooks.getField("active").setBoolean(null,true);}
         Class<?> handlerClass=Class.forName("org.libsdl.app.SDLJoystickHandler_API16",true,loader),stick=Class.forName("org.libsdl.app.SDLJoystickHandler_API16$SDLJoystick",true,loader);java.lang.reflect.Constructor<?> constructor=handlerClass.getDeclaredConstructor();constructor.setAccessible(true);Object handler=constructor.newInstance();Field devices=handlerClass.getDeclaredField("mJoysticks");devices.setAccessible(true);java.util.ArrayList<Object> list=(java.util.ArrayList<Object>)devices.get(handler);java.lang.reflect.Constructor<?> stickConstructor=stick.getDeclaredConstructor();stickConstructor.setAccessible(true);Object first=stickConstructor.newInstance(),second=stickConstructor.newInstance();Field deviceId=stick.getDeclaredField("device_id");deviceId.setAccessible(true);deviceId.setInt(first,7);deviceId.setInt(second,42);list.add(first);list.add(second);Method find=handlerClass.getDeclaredMethod("getJoystick",int.class);find.setAccessible(true);check(find.invoke(handler,7)==first&&find.invoke(handler,42)==second,"Allocation-free joystick lookup returns the matching device");check(find.invoke(handler,99)==null,"Missing joystick lookup remains safe");list.remove(first);check(find.invoke(handler,7)==null&&find.invoke(handler,42)==second,"Joystick lookup stays correct after device removal");
     }
-    private View named(List<View> views,String text){for(View v:views)if(v instanceof TextView&&text.contentEquals(((TextView)v).getText()))return v;return null;}
+    private View named(List<View> views,String text){for(View v:views)if(v instanceof TextView&&matchesText(text,((TextView)v).getText()))return v;return null;}
     private void testModernMenu(Context context,ClassLoader loader)throws Exception {
         for(String retired:new String[]{"Haptics","FrameGraph","RightInput","ControllerUi","ControllerInput"}){try{Class.forName("com.naruto.r2."+retired,true,loader);throw new AssertionError("Retired class present "+retired);}catch(ClassNotFoundException expected){check(true,"Retired runtime removed: "+retired);}}
         Class<?> menu=Class.forName("com.naruto.r2.GameMenu",true,loader),actions=Class.forName("com.naruto.r2.GameMenu$Actions",true,loader);

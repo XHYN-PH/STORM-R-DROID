@@ -25,7 +25,7 @@ python3 r1/build_r1.py --r2 --android-jar /path/to/android.jar \
   --build-tools /path/to/build-tools/35.0.0 --ndk /path/to/android-ndk-r28c \
   --upstream /path/to/upstream.apk --apktool /path/to/apktool.jar \
   --keystore /private/release.p12 --password-file /private/release.pass \
-  --alias xhyn-r1 --output /path/to/STORM-R-R1-arm64.apk
+  --alias xhyn-r1 --output "/path/to/STORM R.apk"
 ```
 
 The `--r2` option applies the complete retained feature set and is required for this edition. Signature-only upstream stubs are excluded from the runtime DEX. Patch targets must match the pinned APK; mismatched hashes/methods cause an error instead of applying unchecked changes.

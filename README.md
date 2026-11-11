@@ -1,5 +1,5 @@
 <div align="center">
-  <img src="docs/screenshots/icone.png" alt="STORM Revolution circular Naruto artwork" width="144">
+  <img src="docs/screenshots/icone.png" alt="STORM R circular green and gold Leaf emblem" width="144">
 
 # STORM R
 
@@ -7,7 +7,7 @@
 
 An English Android edition of the STORM R native port, with refined menus, save tools and a smaller, adjustable FPS panel.
 
-[**Download the latest APK**](https://github.com/XHYN-PH/STORM-R-DROID/releases/latest) · [**Telegram**](https://t.me/xhynports) · [**YouTube**](https://youtube.com/@xhyn_ph) · [**R1 changes**](CHANGELOG_R1.md)
+[**APK releases**](https://github.com/XHYN-PH/STORM-R-DROID/releases) · [**Telegram**](https://t.me/xhynports) · [**YouTube**](https://youtube.com/@xhyn_ph) · [**R1 changes**](CHANGELOG_R1.md)
 
 </div>
 
@@ -22,7 +22,7 @@ The focus is a cleaner interface, more useful Android options and less unnecessa
 | Feature | Original app | This edition |
 | --- | --- | --- |
 | Language | Portuguese launcher and settings | English launcher, settings, controls and messages |
-| App identity | Original name and icon | **STORM R** with the original circular Revolution artwork |
+| App identity | Original name and icon | **STORM R** with the HD circular green and gold Leaf emblem |
 | Menus and effects | Legacy dialogs and decorative particles | Rounded dark menus with gold accents; simple bounce and press feedback retained |
 | FPS/statistics panel | Fixed size | Smaller by default, adjustable from **50–125%**, with separate game/output FPS and a compact mode |
 | Save management | Save import | Import, export, backups and restoration safeguards |
@@ -43,7 +43,7 @@ The original Revolution launcher layout, touch controls, controller mapping scre
 
 ## Install or update
 
-1. Open the [latest release](https://github.com/XHYN-PH/STORM-R-DROID/releases/latest) and download **STORM-R-R1-arm64.apk**.
+1. Check [APK releases](https://github.com/XHYN-PH/STORM-R-DROID/releases). When R1 is published, its APK is named **STORM R.apk**.
 2. Install the APK. Future releases signed with the same XHYN_PH key can update this edition without uninstalling it.
 3. Open **STORM R** and grant file access when requested.
 4. Select the extracted game folder containing `default.xex`, choose your settings, then tap **Play**.

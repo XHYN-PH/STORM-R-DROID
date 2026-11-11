@@ -3,7 +3,7 @@
 Modified and Translated by XHYN_PH. Based on the original STORM Revolution Android port v1.1.11.
 
 - English launcher, settings, controller labels, messages and native status text.
-- Renamed the app to **STORM R**, keeping the original circular Revolution artwork.
+- Renamed the app to **STORM R**, with a sharpened HD green and gold Leaf emblem, a circular gold rim and transparent corners.
 - Replaced the PT-BR switch with **Logging**, off by default, and fixed game language to English.
 - Updated the YouTube footer to **Modified and Translated by XHYN_PH**, opening https://youtube.com/@xhyn_ph.
 - Removed decorative click particles while retaining simple bounce and press feedback.
