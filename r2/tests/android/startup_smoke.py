@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 # Copyright (c) 2026 XHYN_PH. SPDX-License-Identifier: MIT
 """Run the actual game activity in :game through the native loader boundary."""
-import os,re,subprocess,time,xml.etree.ElementTree as ET
+import base64,os,re,subprocess,time,xml.etree.ElementTree as ET
 from pathlib import Path
 
 result=Path(os.environ['RUNNER_TEMP'])/'r1-results'
@@ -66,6 +66,14 @@ for version,file in [('R2','R2-ci-only.apk')]:
             hierarchy=dump_menu('R2-native-loader.xml')
             messages=[node.get('text','') for node in hierarchy.iter('node')]
             assert any('missing default.xex' in text for text in messages),'The native loader did not reach the expected empty-fixture boundary.'
+            # Capture a real native-engine dialog in :game, not a launcher-hosted mock.
+            remote='/sdcard/r2-native-dialog.png'
+            command('shell','screencap','-p',remote)
+            picture=result/'native-dialog.png';command('pull',remote,picture)
+            if picture.stat().st_size<=180000:
+                encoded=base64.b64encode(picture.read_bytes()).decode()
+                parts=[encoded[i:i+4000] for i in range(0,len(encoded),4000)]
+                for index,part in enumerate(parts,1):notice(f'R2 preview native-dialog {index:02d}/{len(parts):02d}',part)
             session=command('shell','cat',f'/data/data/{package}/files/r2-last-session.txt')
             assert 'App: STORM R R1' in session and 'Last foreground Android display rate:' in session,'Real game activity did not capture the new session metadata.'
             (result/'R2-session-details.txt').write_text(session)
