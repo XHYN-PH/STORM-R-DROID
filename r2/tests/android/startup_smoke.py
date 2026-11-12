@@ -66,18 +66,26 @@ for version,file in [('R2','R2-ci-only.apk')]:
             hierarchy=dump_menu('R2-native-loader.xml')
             messages=[node.get('text','') for node in hierarchy.iter('node')]
             assert any('missing default.xex' in text for text in messages),'The native loader did not reach the expected empty-fixture boundary.'
+            assert 'STORM R' in messages and not any('Dark Souls' in text for text in messages),'The native error dialog uses the wrong game title.'
             # Capture a real native-engine dialog in :game, not a launcher-hosted mock.
             remote='/sdcard/r2-native-dialog.png'
             command('shell','screencap','-p',remote)
             picture=result/'native-dialog.png';command('pull',remote,picture)
             # The CI JDK provides ImageIO, so previews need no extra Python packages.
             converter=tools/'NativePreview.java'
-            converter.write_text('''import java.awt.*;import java.awt.image.*;import javax.imageio.ImageIO;import java.io.*;
+            converter.write_text('''import java.awt.*;import java.awt.image.*;import javax.imageio.*;import java.io.*;
             class NativePreview {public static void main(String[] args)throws Exception {
-              BufferedImage source=ImageIO.read(new File(args[0]));int width=Math.min(960,source.getWidth());
-              BufferedImage target=new BufferedImage(width,Math.max(1,source.getHeight()*width/source.getWidth()),BufferedImage.TYPE_INT_RGB);
-              Graphics2D graphics=target.createGraphics();graphics.setRenderingHint(RenderingHints.KEY_INTERPOLATION,RenderingHints.VALUE_INTERPOLATION_BILINEAR);
-              graphics.drawImage(source,0,0,target.getWidth(),target.getHeight(),null);graphics.dispose();ImageIO.write(target,"jpg",new File(args[1]));
+              BufferedImage source=ImageIO.read(new File(args[0]));byte[] data=null;
+              for(int width=Math.min(640,source.getWidth());width>=240;width-=80){
+                BufferedImage target=new BufferedImage(width,Math.max(1,source.getHeight()*width/source.getWidth()),BufferedImage.TYPE_INT_RGB);
+                Graphics2D graphics=target.createGraphics();graphics.setRenderingHint(RenderingHints.KEY_INTERPOLATION,RenderingHints.VALUE_INTERPOLATION_BILINEAR);
+                graphics.drawImage(source,0,0,target.getWidth(),target.getHeight(),null);graphics.dispose();
+                ByteArrayOutputStream bytes=new ByteArrayOutputStream();ImageWriter writer=ImageIO.getImageWritersByFormatName("jpg").next();
+                try(var output=ImageIO.createImageOutputStream(bytes)){writer.setOutput(output);ImageWriteParam options=writer.getDefaultWriteParam();options.setCompressionMode(ImageWriteParam.MODE_EXPLICIT);options.setCompressionQuality(.35f);writer.write(null,new IIOImage(target,null,null),options);}finally{writer.dispose();}
+                data=bytes.toByteArray();if(data.length<=12000)break;
+              }
+              if(data==null||data.length>12000)throw new IOException("Native preview exceeds the retained annotation budget");
+              java.nio.file.Files.write(java.nio.file.Path.of(args[1]),data);
             }}''')
             preview=result/'native-dialog.preview.jpg'
             subprocess.run(['java','-Djava.awt.headless=true',str(converter),str(picture),str(preview)],check=True,timeout=30)
