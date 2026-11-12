@@ -66,7 +66,7 @@ for version,file in [('R2','R2-ci-only.apk')]:
             hierarchy=dump_menu('R2-native-loader.xml')
             messages=[node.get('text','') for node in hierarchy.iter('node')]
             assert any('missing default.xex' in text for text in messages),'The native loader did not reach the expected empty-fixture boundary.'
-            assert 'STORM R' in messages and not any('Dark Souls' in text for text in messages),'The native error dialog uses the wrong game title.'
+            assert any(text.strip()=='STORM R' for text in messages) and not any('Dark Souls' in text for text in messages),'The native error dialog uses the wrong game title.'
             # Capture a real native-engine dialog in :game, not a launcher-hosted mock.
             remote='/sdcard/r2-native-dialog.png'
             command('shell','screencap','-p',remote)
