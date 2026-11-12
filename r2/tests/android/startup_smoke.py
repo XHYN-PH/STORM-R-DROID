@@ -72,7 +72,7 @@ for version,file in [('R2','R2-ci-only.apk')]:
             picture=result/'native-dialog.png';command('pull',remote,picture)
             if picture.stat().st_size<=180000:
                 encoded=base64.b64encode(picture.read_bytes()).decode()
-                parts=[encoded[i:i+4000] for i in range(0,len(encoded),4000)]
+                parts=[encoded[i:i+3000] for i in range(0,len(encoded),3000)]
                 for index,part in enumerate(parts,1):notice(f'R2 preview native-dialog {index:02d}/{len(parts):02d}',part)
             session=command('shell','cat',f'/data/data/{package}/files/r2-last-session.txt')
             assert 'App: STORM R R1' in session and 'Last foreground Android display rate:' in session,'Real game activity did not capture the new session metadata.'
