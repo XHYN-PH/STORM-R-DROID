@@ -2,7 +2,6 @@
 # Copyright (c) 2026 XHYN_PH. SPDX-License-Identifier: MIT
 """A reversible diagnostic build with the original engine-facing startup path."""
 from pathlib import Path
-import copy
 import re
 from xml.etree import ElementTree as ET
 
@@ -17,6 +16,7 @@ LOCK = '''    invoke-static/range {p0 .. p0}, Lcom/naruto/r2/GameHooks;->gameSta
     return-void
     :startup_test_lock_ready'''
 METADATA = '    invoke-static/range {p0 .. p0}, Lcom/naruto/r2/SessionDetails;->start(Lcom/naruto/port/NarutoActivity;)V'
+PRESENTATION = '    invoke-static/range {p0 .. p0}, Lcom/naruto/r2/GameHooks;->presentationReady(Landroid/app/Activity;)V'
 STOP = '    invoke-static/range {p0 .. p0}, Lcom/naruto/r2/GameHooks;->gameStop(Landroid/app/Activity;)V'
 
 
@@ -52,10 +52,10 @@ def apply(reference, decoded):
     if create.count(super_call) != 1:
         raise ValueError('Original SDL creation changed')
     create = create.replace(super_call, super_call + '\n' + LOCK)
-    # The only post-create extension records Java-side metadata; it never samples JNI.
-    create = create.replace('    return-void', METADATA + '\n    return-void')
+    # Restore presentation settings without starting added native polling/refresh hooks.
+    create = create.replace('    return-void', PRESENTATION + '\n' + METADATA + '\n    return-void')
     # Avoid recording a failed save-lock attempt as a running game session.
-    create = create.replace(METADATA + '\n    return-void\n    :startup_test_lock_ready', '    return-void\n    :startup_test_lock_ready')
+    create = create.replace(PRESENTATION + '\n' + METADATA + '\n    return-void\n    :startup_test_lock_ready', '    return-void\n    :startup_test_lock_ready')
     game = replace(game, CREATE, create)
     game = replace(game, DESTROY, original[DESTROY].replace('    return-void', STOP + '\n    return-void'))
     game = replace(game, REFRESH, original[REFRESH])
@@ -72,8 +72,7 @@ def apply(reference, decoded):
     invoke-static {p0, p1}, Lcom/naruto/r2/SessionDetails;->focus(Lcom/naruto/port/NarutoActivity;Z)V
     return-void
 .end method''')
-    game = replace(game, '.method private applyStretch(Z)V', original['.method private applyStretch(Z)V'])
-    game = replace(game, '.method private applyControllerMode()V', original['.method private applyControllerMode()V'])
+    # Keep the existing wrappers that apply Crop and touch visibility from modern menus.
     (decoded / GAME).write_text(game)
 
     # Keep the original main-thread statistics/preparation scheduling and SDL lookup.
@@ -102,45 +101,13 @@ def apply(reference, decoded):
 .end method
 '''
     (decoded / 'smali/a/l0.smali').write_text(touch)
-    stats = (reference / 'smali/a/g0.smali').read_text()
-    ctor = '.method public constructor <init>(Lcom/naruto/port/NarutoActivity;Landroid/content/SharedPreferences;)V'
-    if stats.count(ctor) != 1:
-        raise ValueError('Original statistics constructor changed')
-    stats = stats.replace(ctor, '.method public constructor <init>(Landroid/app/Activity;Landroid/content/SharedPreferences;)V')
-    stats += '\n.field public r2StatsState:Lcom/naruto/r2/StatsOverlay$State;\n'
-    stats += ctor + '''
-    .locals 0
-    invoke-direct {p0, p1, p2}, La/g0;-><init>(Landroid/app/Activity;Landroid/content/SharedPreferences;)V
-    invoke-static {p0}, Lcom/naruto/r2/StatsOverlay;->resize(La/g0;)V
-    return-void
-.end method
-'''
-    (decoded / 'smali/a/g0.smali').write_text(stats)
-
-    # Leave the original configuration writer's engine options authoritative.
-    launcher = decoded / 'smali/com/naruto/port/LauncherActivity.smali'
-    text = launcher.read_text()
-    signature = '.method public final z()V'
-    stock_writer = methods((reference / 'smali/com/naruto/port/LauncherActivity.smali').read_text())[signature]
-    launcher.write_text(replace(text, signature, stock_writer))
-
-    android = '{http://schemas.android.com/apk/res/android}'
-    ET.register_namespace('android', android[1:-1])
-    manifest = ET.parse(decoded / 'AndroidManifest.xml')
-    for activity in manifest.getroot().find('application').findall('activity'):
-        if activity.get(android + 'name') == 'com.naruto.port.NarutoActivity':
-            activity.set(android + 'theme', '@style/StockGameTheme')
-    manifest.write(decoded / 'AndroidManifest.xml', encoding='utf-8', xml_declaration=True)
-    styles = ET.parse(decoded / 'res/values/styles.xml')
-    stock = ET.parse(reference / 'res/values/styles.xml').getroot().find("style[@name='AppTheme']")
-    stock = copy.deepcopy(stock)
-    stock.set('name', 'StockGameTheme')
-    styles.getroot().append(stock)
-    styles.write(decoded / 'res/values/styles.xml', encoding='utf-8', xml_declaration=True)
+    # Retain the shared statistics UI, configuration writer and Material theme from
+    # customize.py. Test 1 unnecessarily reverted these visible, working features.
     (decoded / 'assets/startup-test.txt').write_text(
-        'STORM R original-startup compatibility test 1\n'
-        'Original game JNI polling, refresh selection, rendering and window theme.\n'
-        'Native file-log interception and additional engine configuration overrides are bypassed.\n'
+        'STORM R original-startup compatibility test 2\n'
+        'Original game JNI polling, refresh selection and touch drawing.\n'
+        'STORM 2/3 menu styling, adjustable statistics and display settings retained.\n'
+        'Native file-log interception is bypassed.\n'
         'Native logging follows the original app in this diagnostic build.\n'
         'Not a verified gameplay fix. No save or preference data is deleted.\n')
     verify(reference, decoded)
@@ -149,31 +116,54 @@ def apply(reference, decoded):
 def verify(reference, decoded):
     original = methods((reference / GAME).read_text())
     game = methods((decoded / GAME).read_text())
-    body = game[CREATE].replace('\n' + LOCK, '').replace(METADATA + '\n', '')
+    body = game[CREATE].replace('\n' + LOCK, '').replace(PRESENTATION + '\n', '').replace(METADATA + '\n', '')
     if body != java_logging_only(original[CREATE]):
         raise AssertionError('Startup test changed original game initialization')
     if game[REFRESH] != original[REFRESH]:
         raise AssertionError('Startup test changed original refresh selection')
     if game[DESTROY].replace(STOP + '\n', '') != original[DESTROY]:
         raise AssertionError('Startup test changed original SDL shutdown')
+    stretch_hook = '    invoke-static/range {p0 .. p1}, Lcom/naruto/r2/GameHooks;->stockScreen(Landroid/app/Activity;Z)V\n\n'
+    if game['.method private applyStretch(Z)V'].replace(stretch_hook, '') != original['.method private applyStretch(Z)V']:
+        raise AssertionError('Unexpected native stretch change')
+    controller = '.method private r2OriginalControllerMode()V'
+    if game[controller].replace(controller, '.method private applyControllerMode()V') != original['.method private applyControllerMode()V']:
+        raise AssertionError('Original controller visibility behavior changed')
     signature = '.method public final z()V'
     launcher = Path('smali/com/naruto/port/LauncherActivity.smali')
-    if methods((decoded / launcher).read_text())[signature] != methods((reference / launcher).read_text())[signature]:
-        raise AssertionError('Startup test changed original engine configuration writer')
+    config = '    invoke-static/range {p0 .. p0}, Lcom/naruto/r2/GameHooks;->config(Landroid/app/Activity;)V\n\n'
+    if methods((decoded / launcher).read_text())[signature].replace(config, '') != methods((reference / launcher).read_text())[signature]:
+        raise AssertionError('Unexpected change to the original configuration writer')
     for name in ['smali/a/H.smali', 'smali/org/libsdl/app/SDLJoystickHandler_API16.smali']:
         if (decoded / name).read_bytes() != (reference / name).read_bytes():
             raise AssertionError('Startup test changed original scheduler/input: ' + name)
     menu = (decoded / 'smali/com/naruto/r2/GameMenu$1.smali').read_text()
     if 'GameLoop;->resume' in menu or 'GameHooks;->resumeOriginalStats' not in menu:
         raise AssertionError('FPS toggle can reactivate the added JNI worker')
-    for name in ['smali/a/l0.smali', 'smali/a/g0.smali']:
-        before = methods((reference / name).read_text())
-        after = methods((decoded / name).read_text())
-        for signature, source in before.items():
-            if name.endswith('g0.smali') and 'constructor <init>' in signature:
-                generalized = signature.replace('Lcom/naruto/port/NarutoActivity;', 'Landroid/app/Activity;')
-                if after.get(generalized) != source.replace(signature, generalized):
-                    raise AssertionError('Statistics constructor drifted')
-            elif after.get(signature) != source:
-                raise AssertionError('Original draw/input method drifted: ' + name + ' ' + signature)
-    print('PASS: compatibility profile preserves original engine startup, JNI scheduler, refresh, SDL input and drawing methods.')
+    name = 'smali/a/l0.smali'
+    before = methods((reference / name).read_text())
+    after = methods((decoded / name).read_text())
+    for signature, source in before.items():
+        if after.get(signature) != source:
+            raise AssertionError('Original draw/input method drifted: ' + name + ' ' + signature)
+    android = '{http://schemas.android.com/apk/res/android}'
+    app = ET.parse(decoded / 'AndroidManifest.xml').getroot().find('application')
+    game_activity = next(a for a in app.findall('activity') if a.get(android+'name') == 'com.naruto.port.NarutoActivity')
+    if game_activity.get(android+'theme', app.get(android+'theme')) != '@style/AppTheme':
+        raise AssertionError('Game dialogs do not share the launcher Material theme')
+    stats = methods((decoded/'smali/a/g0.smali').read_text())
+    for signature, helper in [('.method public setValues([F)V', 'update'), ('.method public final onDraw(Landroid/graphics/Canvas;)V', 'draw')]:
+        if 'Lcom/naruto/r2/StatsOverlay;->'+helper not in stats[signature]:
+            raise AssertionError('Shared statistics UI was reverted')
+    allowed = {'.method public constructor <init>(Lcom/naruto/port/NarutoActivity;Landroid/content/SharedPreferences;)V',
+               '.method public final a()V', '.method public setValues([F)V', '.method public final onDraw(Landroid/graphics/Canvas;)V'}
+    for signature, source in methods((reference/'smali/a/g0.smali').read_text()).items():
+        if signature == '.method private setCollapsed(Z)V':
+            current = stats['.method private r2OriginalSetCollapsed(Z)V'].replace('r2OriginalSetCollapsed(', 'setCollapsed(')
+        elif signature in allowed:
+            continue
+        else:
+            current = stats.get(signature)
+        if current != source:
+            raise AssertionError('Original statistics gesture changed: ' + signature)
+    print('PASS: original startup/JNI scheduling and touch input retained; shared theme, statistics and settings remain active.')

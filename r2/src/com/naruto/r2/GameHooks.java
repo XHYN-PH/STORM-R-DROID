@@ -44,7 +44,13 @@ public final class GameHooks {
     }
     public static void gameReady(final Activity a){
         if(a.isFinishing())return;
-        if(a instanceof com.naruto.port.NarutoActivity){GameMenu.applyTouch((com.naruto.port.NarutoActivity)a);StartupFeedback.begin((com.naruto.port.NarutoActivity)a);SessionDetails.start((com.naruto.port.NarutoActivity)a);}
+        presentationReady(a);
+        if(a instanceof com.naruto.port.NarutoActivity){StartupFeedback.begin((com.naruto.port.NarutoActivity)a);SessionDetails.start((com.naruto.port.NarutoActivity)a);}
+    }
+    /** UI-only setup shared with the original-startup compatibility build. */
+    public static void presentationReady(final Activity a){
+        if(a.isFinishing())return;
+        if(a instanceof com.naruto.port.NarutoActivity)GameMenu.applyTouch((com.naruto.port.NarutoActivity)a);
         final SharedPreferences p=prefs(a);
         final View surface=findSurface(a.getWindow().getDecorView());
         if(surface!=null)surface.addOnLayoutChangeListener((v,l,t,r,b,ol,ot,or,ob)->applyCrop(surface,p.getInt("r2_screen",0),p.getInt("r2_crop",100)));

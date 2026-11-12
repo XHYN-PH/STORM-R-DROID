@@ -17,6 +17,8 @@ STORM R is my modified English edition of the [original native port](https://git
 
 The focus is a cleaner interface, more useful Android options and less unnecessary work in the menus and overlays. Performance and compatibility still depend on the phone, driver and game scene.
 
+**Startup compatibility testing:** the system Vulkan driver has been reported working on an Adreno 750 phone. Turnip Gen8 V39-patched still produces a black screen/crash on that phone. [Startup test 2](https://github.com/XHYN-PH/STORM-R-DROID/releases/tag/R1-startup-test2) restores the STORM 2/3 menu styling, adjustable statistics and added display settings while retaining the original native startup/polling. It is a test build, not a confirmed Turnip fix. Native game logging follows the original app during this test.
+
 ## What changed from the original?
 
 | Feature | Original app | This edition |

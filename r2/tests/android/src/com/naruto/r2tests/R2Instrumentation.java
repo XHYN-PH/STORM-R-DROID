@@ -277,6 +277,21 @@ public final class R2Instrumentation extends Instrumentation {
                 long t=SystemClock.uptimeMillis();
                 for(int action:new int[]{MotionEvent.ACTION_DOWN,MotionEvent.ACTION_MOVE,MotionEvent.ACTION_CANCEL}){MotionEvent event=MotionEvent.obtain(t,t+10,action,x,y,0);touchView[0].onTouchEvent(event);event.recycle();}
                 check(inputs.size()>=2&&(inputs.get(0)[0]&4096)!=0&&inputs.get(inputs.size()-1)[0]==0,"Stock touch press and cancellation still deliver native button transitions immediately");
+            }catch(Throwable e){error[0]=e;}});if(error[0]!=null)throw new RuntimeException(error[0]);
+        } finally {
+            runOnMainSync(()->{if(frame[0]!=null&&frame[0].getParent() instanceof ViewGroup)((ViewGroup)frame[0].getParent()).removeView(frame[0]);});
+        }
+        testStatistics(context,loader);
+    }
+    private void testStatistics(Context context,ClassLoader loader)throws Exception {
+        Class<?> stats=Class.forName("a.g0",true,loader),statsHelper=Class.forName("com.naruto.r2.StatsOverlay",true,loader);
+        final android.widget.FrameLayout[] frame={null};final View[] statsView={null};final Throwable[] error={null};
+        SharedPreferences prefs=context.getSharedPreferences("naruto",0);prefs.edit().remove("r2_stats_scale").remove("stats_collapsed").commit();
+        try {
+            runOnMainSync(()->{try{
+                Class.forName("com.naruto.r2.LauncherMotion",true,loader).getMethod("pause",Activity.class).invoke(null,launcher);
+                frame[0]=new android.widget.FrameLayout(launcher);frame[0].setBackgroundColor(android.graphics.Color.BLACK);
+                launcher.addContentView(frame[0],new ViewGroup.LayoutParams(-1,-1));
                 statsView[0]=(View)stats.getConstructor(Activity.class,SharedPreferences.class).newInstance(launcher,prefs);
                 statsHelper.getMethod("resize",stats).invoke(null,statsView[0]);
                 float d=context.getResources().getDisplayMetrics().density;
@@ -459,6 +474,40 @@ public final class R2Instrumentation extends Instrumentation {
             if(failure[0]!=null)throw new RuntimeException(failure[0]);
         }finally{release.countDown();runOnMainSync(()->{try{samples.getMethod("destroy",game).invoke(null,instance[0]);startup.getMethod("destroy",game).invoke(null,instance[0]);}catch(Exception e){throw new RuntimeException(e);}});source.set(null,original);}
     }
+    private void testSharedPresentation(Context context,ClassLoader loader,List<View> views)throws Exception {
+        android.content.pm.ActivityInfo game=context.getPackageManager().getActivityInfo(new android.content.ComponentName(context.getPackageName(),"com.naruto.port.NarutoActivity"),0);
+        int theme=game.getThemeResource();
+        check(theme==context.getApplicationInfo().theme,"Game and launcher inherit the same theme rather than the old Android theme");
+        android.view.ContextThemeWrapper styled=new android.view.ContextThemeWrapper(context,theme);
+        android.util.TypedValue value=new android.util.TypedValue();
+        check(styled.getTheme().resolveAttribute(android.R.attr.alertDialogTheme,value,true)&&"StormDialog".equals(context.getResources().getResourceEntryName(value.resourceId)),"Native game dialogs resolve the shared dark Material dialog style");
+        View display=null;for(View view:views)if(view instanceof TextView&&"Display".contentEquals(((TextView)view).getText())&&view.hasOnClickListeners())display=view;
+        check(display!=null,"Display settings remain available in the stock launcher layout");final View button=display;
+        runOnMainSync(()->button.performClick());waitForIdleSync();
+        android.view.accessibility.AccessibilityNodeInfo root=getUiAutomation().getRootInActiveWindow();
+        check(root!=null&&!root.findAccessibilityNodeInfosByText("Shadows").isEmpty()&&!root.findAccessibilityNodeInfosByText("FPS / statistics size").isEmpty(),"Display dialog retains the shared options");
+        screenshot(context,"display");
+        List<android.view.accessibility.AccessibilityNodeInfo> done=root.findAccessibilityNodeInfosByText("Done");
+        check(!done.isEmpty(),"Display has a visible Done action");
+        android.graphics.Rect bounds=new android.graphics.Rect();done.get(0).getBoundsInScreen(bounds);
+        check(bounds.top>=0&&bounds.bottom<=context.getResources().getDisplayMetrics().heightPixels,"Display action fits the configured font size");
+        check(done.get(0).performAction(android.view.accessibility.AccessibilityNodeInfo.ACTION_CLICK),"Display settings close normally");waitForIdleSync();
+        File config=new File(context.getExternalFilesDir(null),"naruto.ini");byte[] original=config.isFile()?java.nio.file.Files.readAllBytes(config.toPath()):null;
+        SharedPreferences prefs=context.getSharedPreferences("naruto",0);java.util.Map<String,?> before=prefs.getAll();
+        String[] keys={"r2_gamma","r2_shadow","r2_budget","r2_cache","r2_screen"};
+        try {
+            prefs.edit().putFloat(keys[0],1.1f).putInt(keys[1],720).putInt(keys[2],1024).putInt(keys[3],128).putInt(keys[4],2).commit();
+            write(config,"language = pt\nstretch = 1\noriginal_setting = keep\n");
+            Class.forName("com.naruto.r2.GameHooks",true,loader).getMethod("config",Activity.class).invoke(null,launcher);
+            String text=read(config);
+            check(text.contains("language = en")&&text.contains("original_setting = keep"),"Configuration extension retains stock settings and English");
+            check(text.contains("xnr.renut_brightness_gamma = 1.1")&&text.contains("xnr.szr_shadow_map_max_height = 720")&&text.contains("xnr.gpu_budget_mb = 1024")&&text.contains("xnr.banjo_renut_stream_cache_mb = 128"),"Exposed display and memory settings are written instead of being bypassed");
+            check(text.contains("stretch = 0")&&text.contains("xnr.renut_present_stretch = false"),"Proportional Crop does not enable stretching");
+        } finally {
+            if(original==null)config.delete();else java.nio.file.Files.write(config.toPath(),original);
+            SharedPreferences.Editor restore=prefs.edit();for(String key:keys){Object old=before.get(key);if(old instanceof Float)restore.putFloat(key,(Float)old);else if(old instanceof Integer)restore.putInt(key,(Integer)old);else restore.remove(key);}restore.commit();
+        }
+    }
     private void testStartupCompatibility(Context context,ClassLoader loader)throws Exception {
         check(context.getPackageManager().getPackageInfo(context.getPackageName(),0).getLongVersionCode()==122,"Compatibility test permits reinstalling R1 without a version downgrade");
         try(java.io.InputStream input=context.getAssets().open("startup-test.txt")){
@@ -476,6 +525,8 @@ public final class R2Instrumentation extends Instrumentation {
         screenshot(context,"launcher");
         testSessionDetailsAndClosing(context,loader);
         testSaveFiles(context,loader);
+        testSharedPresentation(context,loader,views);
+        testStatistics(context,loader);
         testModernMenu(context,loader);
         testController(context,loader);
     }
@@ -487,7 +538,7 @@ public final class R2Instrumentation extends Instrumentation {
         boolean originalPt=prefs.getBoolean("menu_ptbr",false);
         try {
             String version=context.getPackageManager().getPackageInfo(context.getPackageName(),0).versionName;
-            if("R1-startup-test1".equals(version)){
+            if("R1-startup-test2".equals(version)){
                 testStartupCompatibility(context,context.getClassLoader());
                 result.putString("r1_result","PASS");result.putInt("assertions",assertions);
                 result.putString("stream","R2_ANDROID_RESULT=PASS assertions="+assertions+" profile=original-startup\n");

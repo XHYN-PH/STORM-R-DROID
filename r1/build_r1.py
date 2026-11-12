@@ -23,7 +23,7 @@ def digest(path):
         return hashlib.file_digest(source, 'sha256').hexdigest()
 
 def build(args):
-    version_name = 'R1-startup-test1' if args.startup_test else 'R1'
+    version_name = 'R1-startup-test2' if args.startup_test else 'R1'
     # Equal version codes permit installing either test or R1 over the other without deleting data.
     version_code = 122
     original = args.upstream.resolve()
