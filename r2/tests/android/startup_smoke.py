@@ -70,10 +70,20 @@ for version,file in [('R2','R2-ci-only.apk')]:
             remote='/sdcard/r2-native-dialog.png'
             command('shell','screencap','-p',remote)
             picture=result/'native-dialog.png';command('pull',remote,picture)
-            if picture.stat().st_size<=180000:
-                encoded=base64.b64encode(picture.read_bytes()).decode()
-                parts=[encoded[i:i+3000] for i in range(0,len(encoded),3000)]
-                for index,part in enumerate(parts,1):notice(f'R2 preview native-dialog {index:02d}/{len(parts):02d}',part)
+            # The CI JDK provides ImageIO, so previews need no extra Python packages.
+            converter=tools/'NativePreview.java'
+            converter.write_text('''import java.awt.*;import java.awt.image.*;import javax.imageio.ImageIO;import java.io.*;
+            class NativePreview {public static void main(String[] args)throws Exception {
+              BufferedImage source=ImageIO.read(new File(args[0]));int width=Math.min(960,source.getWidth());
+              BufferedImage target=new BufferedImage(width,Math.max(1,source.getHeight()*width/source.getWidth()),BufferedImage.TYPE_INT_RGB);
+              Graphics2D graphics=target.createGraphics();graphics.setRenderingHint(RenderingHints.KEY_INTERPOLATION,RenderingHints.VALUE_INTERPOLATION_BILINEAR);
+              graphics.drawImage(source,0,0,target.getWidth(),target.getHeight(),null);graphics.dispose();ImageIO.write(target,"jpg",new File(args[1]));
+            }}''')
+            preview=result/'native-dialog.preview.jpg'
+            subprocess.run(['java','-Djava.awt.headless=true',str(converter),str(picture),str(preview)],check=True,timeout=30)
+            encoded=base64.b64encode(preview.read_bytes()).decode()
+            parts=[encoded[i:i+3000] for i in range(0,len(encoded),3000)]
+            for index,part in enumerate(parts,1):notice(f'R2 preview native-dialog {index:02d}/{len(parts):02d}',part)
             session=command('shell','cat',f'/data/data/{package}/files/r2-last-session.txt')
             assert 'App: STORM R R1' in session and 'Last foreground Android display rate:' in session,'Real game activity did not capture the new session metadata.'
             (result/'R2-session-details.txt').write_text(session)
