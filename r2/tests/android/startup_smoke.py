@@ -8,6 +8,7 @@ result=Path(os.environ['RUNNER_TEMP'])/'r1-results'
 tools=Path(os.environ['RUNNER_TEMP'])/'r1-tools'
 adb=str(Path(os.environ['ANDROID_HOME'])/'platform-tools/adb')
 package='com.naruto.storm4'
+verify_android_trace=os.environ.get('VERIFY_ANDROID_TRACE')=='true'
 def command(*args,check=True,timeout=35):
     return subprocess.run([adb,*map(str,args)],stdout=subprocess.PIPE,stderr=subprocess.STDOUT,text=True,check=check,timeout=timeout).stdout
 
@@ -36,6 +37,8 @@ for version,file in [('R2','R2-ci-only.apk')]:
     log=''
     try:
         print(command('install','--no-incremental','-r',result/file,timeout=90),flush=True)
+        if verify_android_trace:
+            command('install','--no-incremental','-t','-r',tools/'R2-tests.apk',timeout=90)
         command('shell','am','force-stop',package)
         command('shell','appops','set',package,'MANAGE_EXTERNAL_STORAGE','allow')
         command('shell','mkdir','-p',f'/data/data/{package}/shared_prefs',f'/sdcard/Android/data/{package}/files/r2-empty-game')
@@ -99,13 +102,12 @@ for version,file in [('R2','R2-ci-only.apk')]:
             assert_alive();log=read_log(version)
         assert not re.search(r'AndroidRuntime: Process: com\.naruto\.storm4:game',log),'AndroidRuntime reported an uncaught game exception.'
         notice(version+' startup result','PASS: actual :game process alive, SDL native main reached'+(', native missing-game-file dialog reached without the Java startup crash' if version=='R2' else ''))
-        if os.environ.get('VERIFY_ANDROID_TRACE')=='true':
+        if verify_android_trace:
             # The empty fixture never installs the guest signal handler. Exercise
             # Android's real crash recorder against this disposable game process.
-            command('install','--no-incremental','-t','-r',tools/'R2-tests.apk',timeout=90)
             command('shell','kill','-ABRT',pid)
             deadline=time.monotonic()+35
-            while command('shell','cat',f'/proc/{pid}/comm',check=False).strip().startswith('com.naruto'):
+            while pid in command('shell','pidof',package+':game',check=False).split():
                 if time.monotonic()>=deadline:raise AssertionError('The controlled Android crash did not exit.')
                 time.sleep(.5)
             trace=command('shell','am','instrument','-w','-r','-e','native_trace','true',package+'.r2tests/com.naruto.r2tests.R2Instrumentation',timeout=90)
