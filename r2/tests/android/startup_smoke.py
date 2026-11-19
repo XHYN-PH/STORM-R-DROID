@@ -115,6 +115,8 @@ for version,file in [('R2','R2-ci-only.apk')]:
             assert 'R2_ANDROID_RESULT=PASS' in trace and 'R2_ANDROID_RESULT=FAIL' not in trace,trace[-2400:]
             notice('Native trace sharing','PASS: Android native backtrace reached Send log details and is omitted with Logging Off.')
     except Exception as error:
+        if isinstance(error,subprocess.CalledProcessError) and error.stdout:
+            notice('Android command output',error.stdout[-2500:])
         try:
             log=read_log(version)
         except (OSError,subprocess.SubprocessError):
