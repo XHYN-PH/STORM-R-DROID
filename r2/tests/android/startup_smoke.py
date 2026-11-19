@@ -99,6 +99,18 @@ for version,file in [('R2','R2-ci-only.apk')]:
             assert_alive();log=read_log(version)
         assert not re.search(r'AndroidRuntime: Process: com\.naruto\.storm4:game',log),'AndroidRuntime reported an uncaught game exception.'
         notice(version+' startup result','PASS: actual :game process alive, SDL native main reached'+(', native missing-game-file dialog reached without the Java startup crash' if version=='R2' else ''))
+        if os.environ.get('TURNIP_TRACE')=='true':
+            # The empty fixture never installs the guest signal handler. Exercise
+            # Android's real crash recorder against this disposable game process.
+            command('shell','kill','-ABRT',pid)
+            deadline=time.monotonic()+35
+            while command('shell','cat',f'/proc/{pid}/comm',check=False).strip().startswith('com.naruto'):
+                if time.monotonic()>=deadline:raise AssertionError('The controlled Android crash did not exit.')
+                time.sleep(.5)
+            trace=command('shell','am','instrument','-w','-r','-e','native_trace','true',package+'.r2tests/com.naruto.r2tests.R2Instrumentation',timeout=90)
+            (result/'native-trace-test.txt').write_text(trace)
+            assert 'R2_ANDROID_RESULT=PASS' in trace and 'R2_ANDROID_RESULT=FAIL' not in trace,trace[-2400:]
+            notice('Native trace sharing','PASS: Android native backtrace reached Send log details and is omitted with Logging Off.')
     except Exception as error:
         log=read_log(version)
         relevant='\n'.join(line for line in log.splitlines() if 'AndroidRuntime' in line or 'F libc' in line or 'F DEBUG' in line)

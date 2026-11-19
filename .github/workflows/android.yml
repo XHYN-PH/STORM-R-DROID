@@ -8,16 +8,22 @@ on:
         description: Validate the original-startup compatibility diagnostic
         type: boolean
         default: false
+      turnip_trace:
+        description: Validate the Turnip crash report on Android 14
+        type: boolean
+        default: false
 concurrency:
   group: r2-android-${{ github.ref }}
   cancel-in-progress: true
 permissions:
   contents: read
 jobs:
-  android-11:
+  android:
     runs-on: ubuntu-24.04
     env:
-      STARTUP_TEST: ${{ inputs.startup_test || github.ref == 'refs/heads/fix/revolution-startup' }}
+      STARTUP_TEST: ${{ inputs.startup_test || inputs.turnip_trace || github.ref == 'refs/heads/fix/revolution-startup' || github.ref == 'refs/heads/fix/turnip-crash-trace' }}
+      TURNIP_TRACE: ${{ inputs.turnip_trace || github.ref == 'refs/heads/fix/turnip-crash-trace' }}
+      TEST_API: ${{ (inputs.turnip_trace || github.ref == 'refs/heads/fix/turnip-crash-trace') && '34' || '30' }}
     timeout-minutes: 45
     strategy:
       fail-fast: false
@@ -32,7 +38,7 @@ jobs:
       - name: Install official Android test/build packages
         run: |
           set -euo pipefail
-          "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" 'ndk;28.2.13676358' 'build-tools;35.0.0' 'platforms;android-30' 'system-images;android-30;google_apis;x86_64'
+          "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" 'ndk;28.2.13676358' 'build-tools;35.0.0' 'platforms;android-30' "system-images;android-$TEST_API;google_apis;x86_64"
           mkdir -p "$RUNNER_TEMP/r1-tools" "$RUNNER_TEMP/r1-results"
           curl -fLsS -o "$RUNNER_TEMP/r1-tools/apktool.jar" https://github.com/iBotPeaches/Apktool/releases/download/v3.0.3/apktool_3.0.3.jar
           echo "dbf930b076c6b9be08d57c449cacefc3bdd6b71ebd59b3066fc0e1f5b14f9423  $RUNNER_TEMP/r1-tools/apktool.jar" | sha256sum -c -
@@ -45,19 +51,23 @@ jobs:
           keytool -genkeypair -alias xhyn-r1 -keyalg RSA -keysize 2048 -validity 2 -storetype PKCS12 -keystore "$RUNNER_TEMP/r1-tools/test.p12" -storepass:file "$RUNNER_TEMP/r1-tools/test.pass" -dname 'CN=XHYN_PH CI Test Only'
           python3 r2/preflight.py --android-jar "$ANDROID_HOME/platforms/android-30/android.jar" --upstream "$RUNNER_TEMP/r1-tools/upstream.apk" --apktool "$RUNNER_TEMP/r1-tools/apktool.jar" --build-tools "$ANDROID_HOME/build-tools/35.0.0"
           startup_flags=()
-          if [ "$STARTUP_TEST" = true ]; then startup_flags+=(--startup-test); fi
+          if [ "$TURNIP_TRACE" = true ]; then
+            startup_flags+=(--turnip-trace)
+          elif [ "$STARTUP_TEST" = true ]; then
+            startup_flags+=(--startup-test)
+          fi
           python3 r1/build_r1.py --r2 "${startup_flags[@]}" --android-jar "$ANDROID_HOME/platforms/android-30/android.jar" --upstream "$RUNNER_TEMP/r1-tools/upstream.apk" --apktool "$RUNNER_TEMP/r1-tools/apktool.jar" --ndk "$ANDROID_HOME/ndk/28.2.13676358" --build-tools "$ANDROID_HOME/build-tools/35.0.0" --keystore "$RUNNER_TEMP/r1-tools/test.p12" --password-file "$RUNNER_TEMP/r1-tools/test.pass" --output "$RUNNER_TEMP/r1-results/R2-ci-only.apk"
           python3 r2/tests/android/build_tests.py --android-jar "$ANDROID_HOME/platforms/android-30/android.jar" --build-tools "$ANDROID_HOME/build-tools/35.0.0" --keystore "$RUNNER_TEMP/r1-tools/test.p12" --password-file "$RUNNER_TEMP/r1-tools/test.pass" --output "$RUNNER_TEMP/r1-tools/R2-tests.apk"
-      - name: Start hardware-accelerated Android 11 with ARM translation
+      - name: Start hardware-accelerated Android with ARM translation
         run: |
           set -euo pipefail
           test -e /dev/kvm
           sudo chmod 666 /dev/kvm
           export ANDROID_AVD_HOME="$RUNNER_TEMP/r1-avd"
           mkdir -p "$ANDROID_AVD_HOME"
-          echo no | "$ANDROID_HOME/cmdline-tools/latest/bin/avdmanager" create avd --force --name R1_API30 --path "$ANDROID_AVD_HOME/R1_API30.avd" --package 'system-images;android-30;google_apis;x86_64' --device pixel_2
-          printf 'avd.ini.encoding=UTF-8\npath=%s\ntarget=android-30\n' "$ANDROID_AVD_HOME/R1_API30.avd" > "$ANDROID_AVD_HOME/R1_API30.ini"
-          "$ANDROID_HOME/emulator/emulator" -avd R1_API30 -no-window -no-audio -no-boot-anim -no-snapshot -gpu swiftshader -memory 3072 -no-metrics > "$RUNNER_TEMP/r1-results/emulator.log" 2>&1 &
+          echo no | "$ANDROID_HOME/cmdline-tools/latest/bin/avdmanager" create avd --force --name STORM_R --path "$ANDROID_AVD_HOME/STORM_R.avd" --package "system-images;android-$TEST_API;google_apis;x86_64" --device pixel_2
+          printf 'avd.ini.encoding=UTF-8\npath=%s\ntarget=android-%s\n' "$ANDROID_AVD_HOME/STORM_R.avd" "$TEST_API" > "$ANDROID_AVD_HOME/STORM_R.ini"
+          "$ANDROID_HOME/emulator/emulator" -avd STORM_R -no-window -no-audio -no-boot-anim -no-snapshot -gpu swiftshader -memory 3072 -no-metrics > "$RUNNER_TEMP/r1-results/emulator.log" 2>&1 &
           emulator_pid=$!
           booted=false
           for attempt in $(seq 1 90); do

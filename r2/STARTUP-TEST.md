@@ -1,6 +1,14 @@
 # STORM R startup compatibility builds
 
-These builds investigate startup failures in R1. The engine is closed source; neither test is a confirmed Turnip fix.
+These builds investigate startup failures in R1. Repairing Turnip remains an open issue.
+
+## Turnip crash trace
+
+Startup test 2 loads Turnip Gen8 V39-patched and begins rendering. On the affected phone it exits with status 3 both with AMD frame generation on and off. This matches the original engine's fatal signal handler, which calls `_exit(3)` and leaves Android a self-exit record.
+
+Build with `--turnip-trace` to replace the call at the end of that handler with Android libc's `abort()`. This profile keeps Startup test 2's menus, startup behavior and save handling. The handler still returns normally from recoverable signals. The build verifies the original instruction and both libc call targets against the pinned engine.
+
+The test APK is `R1-turnip-trace1` with version code 122. Install over your existing XHYN_PH build, enable **Logging**, reproduce the Turnip failure once, then use **Send log**. On Android 12 or later the report includes the signal and module-relative stack frames from the game process, when Android provides them. It omits the raw crash dump, memory and full paths. Android CI checks the report using a controlled crash in an emulator. Actual Turnip gameplay requires the affected device.
 
 ## Startup test 2
 

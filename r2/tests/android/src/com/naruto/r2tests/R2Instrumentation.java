@@ -27,6 +27,7 @@ public final class R2Instrumentation extends Instrumentation {
     private volatile boolean completed;
     private volatile String lastProgress="starting";
     private Activity launcher;
+    private boolean checkNativeTrace;
     private void check(boolean value, String message) {
         assertions++;
         if (!value) throw new AssertionError(message);
@@ -36,7 +37,11 @@ public final class R2Instrumentation extends Instrumentation {
         lastProgress=message;
         Bundle status = new Bundle(); status.putString("stream", message + "\n"); sendStatus(1, status);
     }
-    @Override public void onCreate(Bundle args) { super.onCreate(args); start(); }
+    @Override public void onCreate(Bundle args) {
+        super.onCreate(args);
+        checkNativeTrace = "true".equals(args.getString("native_trace"));
+        start();
+    }
     private void collect(View view, List<View> views) {
         views.add(view);
         if (view instanceof ViewGroup) {
@@ -530,6 +535,31 @@ public final class R2Instrumentation extends Instrumentation {
         testModernMenu(context,loader);
         testController(context,loader);
     }
+    private void testNativeTrace(Context context, SharedPreferences prefs) throws Exception {
+        check(android.os.Build.VERSION.SDK_INT >= 31, "Android supports sharing native crash traces");
+        Method prepare = Class.forName("com.naruto.r2.SessionDetails", true, context.getClassLoader())
+            .getMethod("prepare", Context.class, String.class);
+        boolean logging = prefs.getBoolean("logging_enabled", false);
+        try {
+            check(logging, "Logging remains enabled for the crashed game session");
+            String report;
+            long deadline = SystemClock.uptimeMillis() + 30000;
+            do {
+                report = (String)prepare.invoke(null, context, "Android crash collection test\n");
+                if (report.contains("Signal: SIGABRT")) break;
+                SystemClock.sleep(500);
+            } while (SystemClock.uptimeMillis() < deadline);
+            check(report.contains("Android exit reason: 5 (native crash)") && report.contains("Signal: SIGABRT"),
+                "Send log details include an actual Android native crash: " + report.substring(Math.max(0, report.length() - 1500)));
+            check(java.util.regex.Pattern.compile("(?m)^#00 pc [a-f0-9]{16} {2}[^/\\n]+$").matcher(report).find(),
+                "Crash attachment contains a relative PC and sanitized module name");
+            prefs.edit().putBoolean("logging_enabled", false).commit();
+            report = (String)prepare.invoke(null, context, "Logging disabled\n");
+            check(!report.contains("Android exit record"), "Send log leaves the native trace out when Logging is off");
+        } finally {
+            prefs.edit().putBoolean("logging_enabled", logging).commit();
+        }
+    }
     @Override public void onStart() {
         Thread watchdog=new Thread(()->{try{Thread.sleep(120000);}catch(InterruptedException done){return;}if(completed)return;StringBuilder trace=new StringBuilder();for(java.util.Map.Entry<Thread,StackTraceElement[]> entry:Thread.getAllStackTraces().entrySet())if(entry.getKey().getName().equals("main")||entry.getKey().getName().contains("Instr")){trace.append(entry.getKey().getName()).append('\n');int n=0;for(StackTraceElement frame:entry.getValue()){trace.append(frame).append('\n');if(++n==12)break;}}Bundle status=new Bundle();status.putString("stream",trace+"R2_STALL_STAGE="+lastProgress+"\n");sendStatus(1,status);},"R2-watchdog");watchdog.setDaemon(true);watchdog.start();
         Bundle result=new Bundle(); Context context=getTargetContext();
@@ -538,8 +568,13 @@ public final class R2Instrumentation extends Instrumentation {
         boolean originalPt=prefs.getBoolean("menu_ptbr",false);
         try {
             String version=context.getPackageManager().getPackageInfo(context.getPackageName(),0).versionName;
-            if("R1-startup-test2".equals(version)){
-                testStartupCompatibility(context,context.getClassLoader());
+            if("R1-startup-test2".equals(version)||"R1-turnip-trace1".equals(version)){
+                if (checkNativeTrace) {
+                    check("R1-turnip-trace1".equals(version), "The real crash probe runs only on the Turnip diagnostic");
+                    testNativeTrace(context, prefs);
+                } else {
+                    testStartupCompatibility(context,context.getClassLoader());
+                }
                 result.putString("r1_result","PASS");result.putInt("assertions",assertions);
                 result.putString("stream","R2_ANDROID_RESULT=PASS assertions="+assertions+" profile=original-startup\n");
                 finish(Activity.RESULT_OK,result);return;

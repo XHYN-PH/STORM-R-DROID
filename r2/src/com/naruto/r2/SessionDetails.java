@@ -30,6 +30,7 @@ public final class SessionDetails {
     private static DisplayManager manager;
     private static DisplayManager.DisplayListener listener;
     private static boolean recording;
+    private static boolean captureNativeExit;
     private static String clean(String value) { return value==null?"Unknown":value.replaceAll("[\\p{Cntrl}]"," ").substring(0,Math.min(256,value.length())); }
     private static String version(Context c) {
         try { PackageInfo p=c.getPackageManager().getPackageInfo(c.getPackageName(),0);return clean(p.versionName)+" / code "+p.getLongVersionCode(); }
@@ -56,6 +57,7 @@ public final class SessionDetails {
     }
     public static void start(NarutoActivity a) {
         started=System.currentTimeMillis();recording=GameHooks.prefs(a).getBoolean("logging_enabled",false);
+        captureNativeExit=recording&&CrashTrace.enabled(a);
         foreground="Not observed";foregroundAt="Not observed";
         if(!recording){File file=new File(a.getFilesDir(),PRIVATE);io.execute(()->{try{java.nio.file.Files.deleteIfExists(file.toPath());}catch(IOException ignored){}});return;}
         try{settings=selected(a);}catch(RuntimeException unavailable){settings="Session settings unavailable\n";}
@@ -82,6 +84,7 @@ public final class SessionDetails {
         long captured=System.currentTimeMillis();String now=Instant.ofEpochMilli(captured).toString(),observed=hz(a);
         if(GameHooks.active&&a.hasWindowFocus()&&!a.isFinishing()){foreground=observed;foregroundAt=now;}
         String text="Session started epoch ms: "+started+"\nSession started UTC: "+Instant.ofEpochMilli(started)+"\nSnapshot epoch ms: "+captured+"\nSnapshot UTC: "+now+"\nPhase: "+phase
+            +(captureNativeExit?"\nSession process PID: "+android.os.Process.myPid():"")
             +"\nLast foreground Android display rate: "+foreground+"\nForeground observation UTC: "+foregroundAt
             +"\nAndroid display rate at snapshot: "+observed+"\n"+settings
             +(a instanceof NarutoActivity?"Refresh recovery: "+Performance.observations((NarutoActivity)a)+"\nStatistics sampling: "+NativeSamples.observations((NarutoActivity)a)+"\n":"");
@@ -108,6 +111,7 @@ public final class SessionDetails {
         String gpu=SessionFiles.read(new File(external,"gpu_info.txt").toPath(),4096,false);
         out.append("\nActive GPU report (native status file)\n");
         for(String line:gpu.split("\\r?\\n"))if(line.startsWith("GPU:")||line.startsWith("vendor ")||line.startsWith("result:"))out.append(clean(line)).append('\n');
+        CrashTrace.append(context,session,epoch,out);
         String text=out.toString();SessionFiles.write(new File(external,SHARED).toPath(),text);return text;
     }
     public static void share(LauncherActivity a,boolean targeted) {

@@ -11,6 +11,7 @@ import shutil
 import subprocess
 import sys
 from zipfile import ZipFile
+import crash_trace
 
 ROOT = Path(__file__).resolve().parent
 UPSTREAM_SHA256 = '38f2435a5dd517da1acbe133615eeb9a021857daf4923d9c996d1bd76b94b567'
@@ -23,7 +24,10 @@ def digest(path):
         return hashlib.file_digest(source, 'sha256').hexdigest()
 
 def build(args):
-    version_name = 'R1-startup-test2' if args.startup_test else 'R1'
+    compatibility_profile = args.startup_test or args.turnip_trace
+    version_name = 'R1-startup-test2' if compatibility_profile else 'R1'
+    if args.turnip_trace:
+        version_name = crash_trace.VERSION
     # Equal version codes permit installing either test or R1 over the other without deleting data.
     version_code = 122
     original = args.upstream.resolve()
@@ -81,14 +85,14 @@ def build(args):
         run(sys.executable, r2/'compile_runtime.py', '--android-jar', args.android_jar,
             '--build-tools', args.build_tools, '--upstream', original, '--apktool', args.apktool)
         run(sys.executable, r2/'customize.py', decoded)
-        if args.startup_test:
+        if compatibility_profile:
             sys.path.insert(0, str(r2))
             import startup_test
             startup_test.apply(reference, decoded)
         run(sys.executable, r2/'verify_linkage.py', decoded)
         sys.path.insert(0, str(r2))
         import overlay_patches
-        if args.startup_test:
+        if compatibility_profile:
             startup_test.verify(reference, decoded)
         else:
             overlay_patches.verify_stock(reference, decoded)
@@ -96,6 +100,9 @@ def build(args):
         if (reference/'smali'/controller).read_bytes() != (decoded/'smali'/controller).read_bytes():
             raise ValueError('The stock controller mapping screen changed')
         verification_version = ['--version-name', version_name, '--version-code', str(version_code)]
+    if args.turnip_trace:
+        crash_trace.apply(decoded)
+        verification_version.append('--turnip-trace')
     run(sys.executable, ROOT/'verify_sources.py', '--original', original, '--decoded', decoded, *verification_version)
     if args.check_only:
         print('PASS: complete translated/customized tree verified; no APK assembled or signed.')
@@ -115,7 +122,7 @@ def build(args):
         if 'lib/arm64-v8a/libxhynlog.so' not in apk.namelist():
             raise ValueError('Missing native logging helper')
     report = json.loads((ROOT/'translation-report.json').read_text())
-    report.update({'version': version_name, 'version_code': version_code, 'startup_test': args.startup_test, 'built': True, 'signed': True,
+    report.update({'version': version_name, 'version_code': version_code, 'startup_test': compatibility_profile, 'turnip_trace': args.turnip_trace, 'built': True, 'signed': True,
                    'native_logging_helper_compiled': True, 'artifact_sha256': digest(out),
                    'host_logging_assertions': 85, 'android_runtime_tested': False})
     (out.parent/'build-report.json').write_text(json.dumps(report, indent=2, ensure_ascii=False)+'\n')
@@ -127,7 +134,9 @@ if __name__ == '__main__':
     for name in ['upstream','apktool','ndk','build-tools','keystore','password-file','output']:
         parser.add_argument('--'+name, type=Path, required=True)
     parser.add_argument('--check-only', action='store_true', help='Prepare and verify all patches without assembling or signing an APK')
-    parser.add_argument('--startup-test', action='store_true', help='Build the original-startup compatibility diagnostic, preserving data and allowing rollback to R1')
+    profile = parser.add_mutually_exclusive_group()
+    profile.add_argument('--startup-test', action='store_true', help='Build Startup test 2 with the original startup behavior')
+    profile.add_argument('--turnip-trace', action='store_true', help='Build the Startup test 2 profile with Android fatal crash reporting')
     parser.add_argument('--r2',action='store_true',help='Apply the selected R2 features after the R1 base customization')
     parser.add_argument('--android-jar',type=Path,help='Android API 30 android.jar; required with --r2')
     parser.add_argument('--alias', default='xhyn-r1')

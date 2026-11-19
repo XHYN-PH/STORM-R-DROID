@@ -9,6 +9,7 @@ import re
 import struct
 from xml.etree import ElementTree as ET
 from zipfile import ZipFile
+import crash_trace
 
 ROOT=Path(__file__).resolve().parent
 
@@ -32,7 +33,8 @@ def method(text, signature):
     require(found is not None,signature)
     return found.group()
 
-def verify(original, decoded, version_name="R1", version_code=122):
+def verify(original, decoded, version_name="R1", version_code=122, turnip_trace=False):
+    require((decoded/crash_trace.MARKER).is_file() == turnip_trace, 'Unexpected crash reporting profile')
     with ZipFile(original) as apk:
         for name in apk.namelist():
             if not name.startswith(('lib/','assets/')) or name.endswith('/') or name=='assets/licenses.txt':continue
@@ -43,9 +45,16 @@ def verify(original, decoded, version_name="R1", version_code=122):
                     old,new=source.encode(),destination.encode()
                     require(len(new)<=len(old) and before.count(old)==1,'Native string bounds')
                     index=before.index(old);expected[index:index+len(old)]=new.ljust(len(old),b' ')
+                if turnip_trace:
+                    crash_trace.route_fatal_exit(expected)
                 require(after==bytes(expected),'Unexpected engine binary changes')
                 a,b=elf_sections(before),elf_sections(after)
-                for section in ['.text','.plt','.dynsym','.rela.plt','.rela.dyn']:
+                text = bytearray(a['.text'])
+                if turnip_trace:
+                    struct.pack_into('<I', text, crash_trace.EXIT_CALL - crash_trace.TEXT_OFFSET,
+                                     crash_trace.branch_link(crash_trace.EXIT_CALL, crash_trace.ABORT_PLT))
+                require(text == b['.text'], 'Unexpected change to engine executable code')
+                for section in ['.plt','.dynsym','.rela.plt','.rela.dyn']:
                     require(a[section]==b[section],'Changed engine executable/linkage section: '+section)
             else:require(before==after,'Changed upstream asset/library: '+name)
         old_notices=apk.read('assets/licenses.txt').decode().replace('\r\n','\n').split('='*60,1)[1]
@@ -99,4 +108,5 @@ if __name__=='__main__':
     parser.add_argument('--original',type=Path,required=True)
     parser.add_argument('--decoded',type=Path,required=True)
     parser.add_argument('--version-name',default='R1');parser.add_argument('--version-code',type=int,default=122)
-    args=parser.parse_args();verify(args.original,args.decoded,args.version_name,args.version_code)
+    parser.add_argument('--turnip-trace', action='store_true')
+    args=parser.parse_args();verify(args.original,args.decoded,args.version_name,args.version_code,args.turnip_trace)
