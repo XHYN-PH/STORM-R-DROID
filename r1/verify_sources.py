@@ -68,6 +68,10 @@ def verify(original, decoded, version_name="R1", version_code=122, turnip_trace=
     require(declared_styles<=defined_styles,'Missing original public style resource')
     smali=decoded/'smali'
     launcher=(smali/'com/naruto/port/LauncherActivity.smali').read_text()
+    provider=(smali/'com/naruto/port/LogProvider.smali').read_text()
+    share_worker=(smali/'a/o.smali').read_text()
+    require(('"tombstone.pb"' in provider) != turnip_trace,'Unexpected raw crash attachment policy')
+    require(('ApplicationExitInfo;->getTraceInputStream()' in share_worker) != turnip_trace,'Unexpected raw crash dump copy')
     require('"menu_ptbr"' not in launcher,'PT-BR control still reachable')
     require('\"logging_enabled\"' in launcher,'Missing logging switch')
     require('"Modified and Translated by XHYN_PH"' in launcher,'Missing R1 author footer')

@@ -1,6 +1,6 @@
 # STORM R startup compatibility builds
 
-These builds investigate startup failures in R1. Repairing Turnip remains an open issue.
+These builds investigate the startup crash reported with Turnip Gen8 V39-patched in R1.
 
 ## Turnip crash trace
 
@@ -8,7 +8,11 @@ Startup test 2 loads Turnip Gen8 V39-patched and begins rendering. On the affect
 
 Build with `--turnip-trace` to replace the call at the end of that handler with Android libc's `abort()`. This profile keeps Startup test 2's menus, startup behavior and save handling. The handler still returns normally from recoverable signals. The build verifies the original instruction and both libc call targets against the pinned engine.
 
-The test APK is `R1-turnip-trace1` with version code 122. Install over your existing XHYN_PH build, enable **Logging**, reproduce the Turnip failure once, then use **Send log**. On Android 12 or later the report includes the signal and module-relative stack frames from the game process, when Android provides them. It omits the raw crash dump, memory and full paths. Android CI checks the report using a controlled crash in an emulator. Actual Turnip gameplay requires the affected device.
+The traces captured with frame generation off and at 2× show the same failure in a data-copy routine of the original Revolution engine. Turnip is loaded and the renderer has already produced frames. The recorder's `SIGABRT` comes from the diagnostic handler. The stack identifies the failing routine and leaves the underlying cause open.
+
+`R1-turnip-trace2` uses version code 122 so it can install over existing XHYN_PH builds. Its **Send log** includes the matching Android exit and a backtrace with module names and relative addresses when Android provides one. The first trace build also shared `tombstone.pb` through the stock log exporter. The second trace build shares the summary in `session-details.txt` and excludes raw crash dumps. It uses the recorded crash time to match renderer logs written after the last activity snapshot. Android CI checks this with a controlled crash.
+
+Choosing **More options → Display → Shadows → Auto (original)** now clears a previously applied shadow cap from the launch configuration. This restores the engine's default for that setting. Turnip gameplay still requires verification on the affected phone.
 
 ## Startup test 2
 
@@ -24,7 +28,7 @@ Build with the normal documented command plus `--startup-test`. Test 2 is `R1-st
 
 The source checks compare actual initialization, polling, refresh, SDL input and touch methods against the translated upstream tree. Android CI checks the shared game theme, functional settings writer, statistics resizing/collapse, stock Send log, save safeguards and menus. The smoke test reaches the real native loader with an empty fixture and confirms the additional native logging library/worker are absent. It cannot prove gameplay compatibility without the phone and game files.
 
-For the Turnip investigation, keep the same folder/driver and explicitly test frame generation Off, then collect a new Send log if it fails. Until compatibility is established, the system driver is the working option reported on the affected phone.
+The system driver is the working option reported on the affected phone. If comparing the fork with the original release, keep the game folder, graphics settings and driver version consistent across both runs.
 
 ## Startup test 1
 

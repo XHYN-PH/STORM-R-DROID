@@ -98,20 +98,25 @@ public final class SessionDetails {
         else out.append("\nNo recorded session details. Enable Logging before the next game launch to record them.\n");
         File log=new File(external,"naruto.log");long epoch=0;Matcher start=Pattern.compile("(?m)^Session started epoch ms: (\\d+)$").matcher(session);if(start.find())try{epoch=Long.parseLong(start.group(1));}catch(NumberFormatException ignored){}
         long snapshot=0;Matcher end=Pattern.compile("(?m)^Snapshot epoch ms: (\\d+)$").matcher(session);if(end.find())try{snapshot=Long.parseLong(end.group(1));}catch(NumberFormatException ignored){}
-        boolean matched=epoch>0&&snapshot>=epoch&&log.isFile()&&log.lastModified()>=epoch-2000&&log.lastModified()<=snapshot+5000;
+        StringBuilder exitDetails = new StringBuilder();
+        long ended = CrashTrace.append(context, session, epoch, exitDetails);
+        // A game crash can stop lifecycle snapshots well before the renderer's last write.
+        long logTime = log.lastModified();
+        long latest = ended > 0 ? ended + 1000 : snapshot + 5000;
+        boolean matched=epoch>0&&snapshot>=epoch&&log.isFile()&&logTime>=epoch-2000&&logTime<=latest;
         out.append("\nRenderer-log timestamps fit the recorded session: ").append(matched?"Yes":"Not established; existing logs may be from an earlier run").append('\n');
         if(matched) {
             String head=SessionFiles.read(log.toPath(),32768,false),tail=SessionFiles.read(log.toPath(),65536,true);
             Matcher resolution=Pattern.compile("Render resolution ([^\\r\\n]+)").matcher(head);if(resolution.find())out.append("Engine render resolution: ").append(clean(resolution.group(1))).append('\n');
-            Matcher rate=Pattern.compile("AMD optical FG: (\\d+)x \\(asked (\\d+)x, screen (\\d+) Hz\\)").matcher(tail);String latest="";
-            while(rate.find())latest="Engine last reported FG / requested FG / refresh: "+rate.group(1)+"x / "+rate.group(2)+"x / "+rate.group(3)+" Hz\n";
-            out.append(latest);
+            Matcher rate=Pattern.compile("AMD optical FG: (\\d+)x \\(asked (\\d+)x, screen (\\d+) Hz\\)").matcher(tail);String latestRate="";
+            while(rate.find())latestRate="Engine last reported FG / requested FG / refresh: "+rate.group(1)+"x / "+rate.group(2)+"x / "+rate.group(3)+" Hz\n";
+            out.append(latestRate);
             out.append(RendererReport.describe(SessionFiles.read(log.toPath(),SessionFiles.MAX_READ,true)));
         }
         String gpu=SessionFiles.read(new File(external,"gpu_info.txt").toPath(),4096,false);
         out.append("\nActive GPU report (native status file)\n");
         for(String line:gpu.split("\\r?\\n"))if(line.startsWith("GPU:")||line.startsWith("vendor ")||line.startsWith("result:"))out.append(clean(line)).append('\n');
-        CrashTrace.append(context,session,epoch,out);
+        out.append(exitDetails);
         String text=out.toString();SessionFiles.write(new File(external,SHARED).toPath(),text);return text;
     }
     public static void share(LauncherActivity a,boolean targeted) {

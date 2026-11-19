@@ -24,15 +24,16 @@ final class CrashTrace {
         }
     }
 
-    static void append(Context context, String session, long started, StringBuilder output) {
-        if (started <= 0 || !enabled(context)) return;
+    static long append(Context context, String session, long started, StringBuilder output) {
+        if (started <= 0 || !enabled(context)) return 0;
         Matcher matcher = PID.matcher(session);
-        if (!matcher.find()) return;
+        if (!matcher.find()) return 0;
         int pid;
         try { pid = Integer.parseInt(matcher.group(1)); }
-        catch (NumberFormatException invalid) { return; }
-        if (pid <= 0) return;
+        catch (NumberFormatException invalid) { return 0; }
+        if (pid <= 0) return 0;
 
+        long ended = 0;
         output.append("\nAndroid exit record for this game session\n");
         try {
             ActivityManager manager = context.getSystemService(ActivityManager.class);
@@ -40,22 +41,24 @@ final class CrashTrace {
             String packageName = context.getPackageName();
             for (ApplicationExitInfo exit : manager.getHistoricalProcessExitReasons(packageName, pid, 1)) {
                 if (!String.valueOf(exit.getProcessName()).equals(packageName + ":game") || exit.getTimestamp() < started) continue;
-                output.append("Exit UTC: ").append(Instant.ofEpochMilli(exit.getTimestamp())).append('\n');
+                ended = exit.getTimestamp();
+                output.append("Exit UTC: ").append(Instant.ofEpochMilli(ended)).append('\n');
                 int reason = exit.getReason();
                 output.append("Android exit reason: ").append(reason);
                 if (reason == ApplicationExitInfo.REASON_CRASH_NATIVE) output.append(" (native crash)");
                 if (reason == ApplicationExitInfo.REASON_EXIT_SELF) output.append(" (self exit)");
                 output.append("\nExit status: ").append(exit.getStatus()).append('\n');
-                if (reason != ApplicationExitInfo.REASON_CRASH_NATIVE || Build.VERSION.SDK_INT < 31) return;
+                if (reason != ApplicationExitInfo.REASON_CRASH_NATIVE || Build.VERSION.SDK_INT < 31) return ended;
                 try (InputStream trace = exit.getTraceInputStream()) {
                     if (trace != null) output.append(NativeBacktrace.describe(trace));
                     else output.append("Android has no native trace available for this exit.\n");
                 }
-                return;
+                return ended;
             }
             output.append("No matching exit recorded yet.\n");
         } catch (IOException | RuntimeException error) {
             output.append("Could not read the Android native trace.\n");
         }
+        return ended;
     }
 }

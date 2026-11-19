@@ -130,7 +130,7 @@ public final class R2Instrumentation extends Instrumentation {
         check(hasText(views,"More options"),"Stock launcher contains one compact More options card");
         android.graphics.drawable.Drawable icon=context.getApplicationInfo().loadIcon(context.getPackageManager());android.graphics.Bitmap iconImage=android.graphics.Bitmap.createBitmap(64,64,android.graphics.Bitmap.Config.ARGB_8888);icon.setBounds(0,0,64,64);icon.draw(new android.graphics.Canvas(iconImage));check(android.graphics.Color.alpha(iconImage.getPixel(0,0))==0&&android.graphics.Color.alpha(iconImage.getPixel(32,32))>0,"Circular app icon has transparent corners and an opaque center");iconImage.recycle();
         check(Class.forName("a.g0",true,loader).getDeclaredMethod("setValues",float[].class)!=null,"Patched stock statistics class verifies on Android");
-        testSessionDetailsAndClosing(context,loader);
+        testSessionDetailsAndClosing(context,loader,false);
         testDriverSupport(context,loader);
         testNativeSampling(context,loader);
         View display=null;for(View v:views)if(v instanceof TextView&&"Display".contentEquals(((TextView)v).getText()))display=v;
@@ -335,7 +335,7 @@ public final class R2Instrumentation extends Instrumentation {
             runOnMainSync(()->{if(frame[0]!=null&&frame[0].getParent() instanceof ViewGroup)((ViewGroup)frame[0].getParent()).removeView(frame[0]);});
         }
     }
-    private void testSessionDetailsAndClosing(Context context,ClassLoader loader)throws Exception {
+    private void testSessionDetailsAndClosing(Context context,ClassLoader loader,boolean summaryOnly)throws Exception {
         Class<?> details=Class.forName("com.naruto.r2.SessionDetails",true,loader),exit=Class.forName("com.naruto.r2.ExitFeedback",true,loader);
         SharedPreferences resolutionPrefs=context.getSharedPreferences("naruto",0);
         boolean hadResolution=resolutionPrefs.contains("menu_resolution_v4"),hadLegacyResolution=resolutionPrefs.contains("menu_resolution_v5");
@@ -351,7 +351,8 @@ public final class R2Instrumentation extends Instrumentation {
             restore.commit();
         }
         File external=context.getExternalFilesDir(null),privateFile=new File(context.getFilesDir(),"r2-last-session.txt"),log=new File(external,"naruto.log"),gpu=new File(external,"gpu_info.txt"),shared=new File(external,"session-details.txt");
-        File[] files={privateFile,log,gpu,shared};byte[][] previous=new byte[files.length][];
+        File rawDump=new File(external,"tombstone.pb");
+        File[] files={privateFile,log,gpu,shared,rawDump};byte[][] previous=new byte[files.length][];
         for(int i=0;i<files.length;i++)if(files[i].isFile())previous[i]=java.nio.file.Files.readAllBytes(files[i].toPath());
         SharedPreferences prefs=context.getSharedPreferences("naruto",0);boolean hadDirectory=prefs.contains("r23_private_test"),hadToken=prefs.contains("r23_token_test");String oldDirectory=prefs.getString("r23_private_test",null),oldToken=prefs.getString("r23_token_test",null);
         final java.util.concurrent.atomic.AtomicReference<Intent> captured=new java.util.concurrent.atomic.AtomicReference<>();
@@ -371,6 +372,15 @@ public final class R2Instrumentation extends Instrumentation {
             android.net.Uri uri=android.net.Uri.parse("content://"+context.getPackageName()+".logs/session-details.txt");
             try(java.io.InputStream stream=context.getContentResolver().openInputStream(uri)){check(stream!=null&&stream.read()=='S',"Original LogProvider can share the new metadata attachment");}
             try{context.getContentResolver().openInputStream(android.net.Uri.parse("content://"+context.getPackageName()+".logs/r2-last-session.txt"));throw new AssertionError("Private metadata exposed");}catch(java.io.FileNotFoundException expected){check(true,"Provider whitelist still rejects private files");}
+            if (summaryOnly) {
+                write(rawDump,"Previously exported raw crash dump fixture");
+                android.net.Uri dumpUri=android.net.Uri.parse("content://"+context.getPackageName()+".logs/tombstone.pb");
+                try (java.io.InputStream ignored=context.getContentResolver().openInputStream(dumpUri)) {
+                    throw new AssertionError("A raw Android crash dump was accessible");
+                } catch (java.io.FileNotFoundException expected) {
+                    check(true,"The trace profile blocks access to earlier raw dumps");
+                }
+            }
             log.setLastModified(now-60000);report=(String)details.getMethod("prepare",Context.class,String.class).invoke(null,context,current);
             check(report.contains("Not established")&&!report.contains("Engine render resolution:"),"Old renderer logs are not presented as observations from the current session");
             log.setLastModified(System.currentTimeMillis());addMonitor(monitor);monitorAdded=true;
@@ -380,6 +390,8 @@ public final class R2Instrumentation extends Instrumentation {
             Intent payload=(Intent)captured.get().getParcelableExtra(Intent.EXTRA_INTENT);java.util.ArrayList<android.net.Uri> attachments=payload.getParcelableArrayListExtra(Intent.EXTRA_STREAM);boolean foundNative=false,foundDetails=false;
             for(android.net.Uri attachment:attachments){foundNative|="naruto.log".equals(attachment.getLastPathSegment());foundDetails|="session-details.txt".equals(attachment.getLastPathSegment());}
             check(foundNative&&foundDetails&&(payload.getFlags()&Intent.FLAG_GRANT_READ_URI_PERMISSION)!=0,"The existing share retains native logs and adds readable session details");
+            if (summaryOnly) check(attachments.stream().noneMatch(attachment->"tombstone.pb".equals(attachment.getLastPathSegment())),
+                "Send log excludes even a pre-existing raw crash dump");
         } finally {
             if(monitorAdded)removeMonitor(monitor);SharedPreferences.Editor restore=prefs.edit();if(hadDirectory)restore.putString("r23_private_test",oldDirectory);else restore.remove("r23_private_test");if(hadToken)restore.putString("r23_token_test",oldToken);else restore.remove("r23_token_test");restore.commit();
             for(int i=0;i<files.length;i++){if(previous[i]==null)java.nio.file.Files.deleteIfExists(files[i].toPath());else java.nio.file.Files.write(files[i].toPath(),previous[i]);}
@@ -508,12 +520,17 @@ public final class R2Instrumentation extends Instrumentation {
             check(text.contains("language = en")&&text.contains("original_setting = keep"),"Configuration extension retains stock settings and English");
             check(text.contains("xnr.renut_brightness_gamma = 1.1")&&text.contains("xnr.szr_shadow_map_max_height = 720")&&text.contains("xnr.gpu_budget_mb = 1024")&&text.contains("xnr.banjo_renut_stream_cache_mb = 128"),"Exposed display and memory settings are written instead of being bypassed");
             check(text.contains("stretch = 0")&&text.contains("xnr.renut_present_stretch = false"),"Proportional Crop does not enable stretching");
+            prefs.edit().putInt("r2_shadow",0).commit();
+            launcher.getClass().getMethod("z").invoke(launcher);
+            text=read(config);
+            check(!text.contains("xnr.szr_shadow_map_max_height")&&text.contains("original_setting = keep"),
+                "Saving Auto clears the earlier shadow override and preserves an unrelated setting");
         } finally {
             if(original==null)config.delete();else java.nio.file.Files.write(config.toPath(),original);
             SharedPreferences.Editor restore=prefs.edit();for(String key:keys){Object old=before.get(key);if(old instanceof Float)restore.putFloat(key,(Float)old);else if(old instanceof Integer)restore.putInt(key,(Integer)old);else restore.remove(key);}restore.commit();
         }
     }
-    private void testStartupCompatibility(Context context,ClassLoader loader)throws Exception {
+    private void testStartupCompatibility(Context context,ClassLoader loader,boolean summaryOnly)throws Exception {
         check(context.getPackageManager().getPackageInfo(context.getPackageName(),0).getLongVersionCode()==122,"Compatibility test permits reinstalling R1 without a version downgrade");
         try(java.io.InputStream input=context.getAssets().open("startup-test.txt")){
             ByteArrayOutputStream bytes=new ByteArrayOutputStream();byte[] buffer=new byte[1024];int count;
@@ -528,7 +545,7 @@ public final class R2Instrumentation extends Instrumentation {
         View send=named(views,"Send log");check(send!=null&&send.hasOnClickListeners(),"Stock Send log remains connected");
         check(hasText(views,"Modified and Translated by XHYN_PH")&&!hasText(views,"PT-BR"),"English footer and language policy are retained");
         screenshot(context,"launcher");
-        testSessionDetailsAndClosing(context,loader);
+        testSessionDetailsAndClosing(context,loader,summaryOnly);
         testSaveFiles(context,loader);
         testSharedPresentation(context,loader,views);
         testStatistics(context,loader);
@@ -553,6 +570,37 @@ public final class R2Instrumentation extends Instrumentation {
                 "Send log details include an actual Android native crash: " + report.substring(Math.max(0, report.length() - 1500)));
             check(java.util.regex.Pattern.compile("(?m)^#00 pc [a-f0-9]{16} {2}[^/\\n]+$").matcher(report).find(),
                 "Crash attachment contains a relative PC and sanitized module name");
+            java.util.regex.Matcher exitTime = java.util.regex.Pattern.compile("(?m)^Exit UTC: (.+)$").matcher(report);
+            check(exitTime.find(), "Android crash history supplies the end of the game session");
+            long ended = java.time.Instant.parse(exitTime.group(1)).toEpochMilli();
+            File snapshot = new File(context.getFilesDir(), "r2-last-session.txt");
+            File renderer = new File(context.getExternalFilesDir(null), "naruto.log");
+            byte[] beforeSnapshot = java.nio.file.Files.readAllBytes(snapshot.toPath());
+            byte[] beforeLog = renderer.isFile() ? java.nio.file.Files.readAllBytes(renderer.toPath()) : null;
+            long beforeLogTime = renderer.lastModified();
+            try {
+                String earlier = read(snapshot)
+                    .replaceFirst("(?m)^Session started epoch ms: \\d+$", "Session started epoch ms: " + (ended - 8000))
+                    .replaceFirst("(?m)^Snapshot epoch ms: \\d+$", "Snapshot epoch ms: " + (ended - 7000));
+                write(snapshot, earlier);
+                write(renderer, "6.5 Render resolution 1920x1080 (1.5x)\n");
+                java.nio.file.Files.setLastModifiedTime(renderer.toPath(), java.nio.file.attribute.FileTime.fromMillis(ended - 500));
+                report = (String)prepare.invoke(null, context, "Android crash collection test\n");
+                check(report.contains("Renderer-log timestamps fit the recorded session: Yes")
+                    && report.contains("Engine render resolution: 1920x1080"),
+                    "The matching native exit keeps renderer writes after the last activity snapshot");
+                java.nio.file.Files.setLastModifiedTime(renderer.toPath(), java.nio.file.attribute.FileTime.fromMillis(ended + 10000));
+                report = (String)prepare.invoke(null, context, "Android crash collection test\n");
+                check(report.contains("Not established") && !report.contains("Engine render resolution:"),
+                    "Renderer writes after this exit cannot be attributed to the crashed session");
+            } finally {
+                java.nio.file.Files.write(snapshot.toPath(), beforeSnapshot);
+                if (beforeLog == null) java.nio.file.Files.deleteIfExists(renderer.toPath());
+                else {
+                    java.nio.file.Files.write(renderer.toPath(), beforeLog);
+                    java.nio.file.Files.setLastModifiedTime(renderer.toPath(), java.nio.file.attribute.FileTime.fromMillis(beforeLogTime));
+                }
+            }
             prefs.edit().putBoolean("logging_enabled", false).commit();
             report = (String)prepare.invoke(null, context, "Logging disabled\n");
             check(!report.contains("Android exit record"), "Send log leaves the native trace out when Logging is off");
@@ -568,12 +616,13 @@ public final class R2Instrumentation extends Instrumentation {
         boolean originalPt=prefs.getBoolean("menu_ptbr",false);
         try {
             String version=context.getPackageManager().getPackageInfo(context.getPackageName(),0).versionName;
-            if("R1-startup-test2".equals(version)||"R1-turnip-trace1".equals(version)){
+            boolean turnipTrace="R1-turnip-trace2".equals(version);
+            if("R1-startup-test2".equals(version)||turnipTrace){
                 if (checkNativeTrace) {
-                    check("R1-turnip-trace1".equals(version), "The real crash probe runs only on the Turnip diagnostic");
+                    check(turnipTrace, "The real crash probe runs only on the Turnip diagnostic");
                     testNativeTrace(context, prefs);
                 } else {
-                    testStartupCompatibility(context,context.getClassLoader());
+                    testStartupCompatibility(context,context.getClassLoader(),turnipTrace);
                 }
                 result.putString("r1_result","PASS");result.putInt("assertions",assertions);
                 result.putString("stream","R2_ANDROID_RESULT=PASS assertions="+assertions+" profile=original-startup\n");

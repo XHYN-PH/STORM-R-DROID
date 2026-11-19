@@ -68,7 +68,10 @@ public final class GameHooks {
         SharedPreferences p=prefs(a);LinkedHashMap<String,String> overrides=new LinkedHashMap<>();
         overrides.put("language","en");
         overrides.put("xnr.renut_brightness_gamma",Float.toString(Math.max(.5f,Math.min(2,p.getFloat("r2_gamma",1)))));
-        int shadow=p.getInt("r2_shadow",0);if(shadow!=0)overrides.put("xnr.szr_shadow_map_max_height",Integer.toString(shadow));
+        if (p.contains("r2_shadow")) {
+            int shadow = p.getInt("r2_shadow", 0);
+            overrides.put("xnr.szr_shadow_map_max_height", shadow == 0 ? null : Integer.toString(shadow));
+        }
         int budget=p.getInt("r2_budget",0);if(budget>0)overrides.put("xnr.gpu_budget_mb",Integer.toString(budget));
         int cache=p.getInt("r2_cache",0);if(cache>0)overrides.put("xnr.banjo_renut_stream_cache_mb",Integer.toString(cache));
         int mode=p.getInt("r2_screen",-1);if(mode>=0){overrides.put("stretch",mode==1?"1":"0");overrides.put("xnr.renut_present_stretch",mode==1?"true":"false");overrides.put("xnr.szr_present_trim","0");}
@@ -83,7 +86,9 @@ public final class GameHooks {
     public static String merge(String source,Map<String,String> values){
         StringBuilder result=new StringBuilder();
         for(String line:source.split("\\r?\\n")){int at=line.indexOf('=');String key=at<0?"":line.substring(0,at).trim();if(!values.containsKey(key))result.append(line).append('\n');}
-        for(Map.Entry<String,String> entry:values.entrySet())result.append(entry.getKey()).append(" = ").append(entry.getValue()).append('\n');
+        for (Map.Entry<String,String> entry : values.entrySet()) {
+            if (entry.getValue() != null) result.append(entry.getKey()).append(" = ").append(entry.getValue()).append('\n');
+        }
         return result.toString();
     }
 }
