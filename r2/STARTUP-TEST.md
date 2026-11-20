@@ -2,6 +2,8 @@
 
 These builds investigate the startup crash reported with Turnip Gen8 V39-patched in R1.
 
+Trace 2 completed a 3-minute 26-second session on Adreno 750 with Turnip Gen8 V39-patched at 1080p, FXAA+, FSR and 2× frame generation, followed by a normal exit. The regular R1.1 build uses the same original startup path and disables automatic game and session log capture.
+
 ## Turnip crash trace
 
 Startup test 2 loads Turnip Gen8 V39-patched and begins rendering. On the affected phone it exits with status 3 both with AMD frame generation on and off. This matches the original engine's fatal signal handler, which calls `_exit(3)` and leaves Android a self-exit record.

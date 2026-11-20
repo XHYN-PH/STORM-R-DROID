@@ -146,9 +146,8 @@ jobs:
           markers=(root/'logging-markers.txt').read_text()
           if os.environ.get('STARTUP_TEST')!='true':
               for kind in ('LOGGING', 'STACK', 'STDERR'):
-                  assert 'R1_'+kind+'_ON_MARKER' in markers, markers
                   assert 'R1_'+kind+'_OFF_MARKER' not in markers, markers
-              print('PASS: Android instrumentation and real app logcat On/Off markers')
+              print('PASS: Android instrumentation and automatic app logging suppression')
           else:
               print('PASS: compatibility UI/save/menu checks; game-native log interception intentionally bypassed')
           import re

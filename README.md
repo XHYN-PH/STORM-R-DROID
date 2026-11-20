@@ -17,7 +17,7 @@ STORM R is my modified English edition of the [original native port](https://git
 
 The focus is a cleaner interface, more useful Android options and less unnecessary work in the menus and overlays. Performance and compatibility still depend on the phone, driver and game scene.
 
-**Startup compatibility testing:** the system Vulkan driver has been reported working on an Adreno 750 phone. Turnip Gen8 V39-patched still produces a black screen/crash on that phone. [Startup test 2](https://github.com/XHYN-PH/STORM-R-DROID/releases/tag/R1-startup-test2) restores the STORM 2/3 menu styling, adjustable statistics and added display settings while retaining the original native startup/polling. It is a test build, not a confirmed Turnip fix. Native game logging follows the original app during this test.
+**Turnip compatibility:** [Trace 2](https://github.com/XHYN-PH/STORM-R-DROID/releases/tag/R1-turnip-trace2) completed a gameplay session on an Adreno 750 with Turnip Gen8 V39-patched, 1080p and 2× frame generation. R1.1 uses the same startup and menu behavior, with automatic logging disabled.
 
 ## What changed from the original?
 
@@ -31,9 +31,9 @@ The focus is a cleaner interface, more useful Android options and less unnecessa
 | Display choices | Fit and Stretch | Fit, Stretch and proportional Crop to fill the display |
 | In-game options | Basic display/control options | Touch visibility and opacity, brightness, panel size and confirmed return to launcher |
 | GPU driver imports | Qualcomm-only picker | Turnip for Adreno, plus experimental PanVK for compatible Mali and RADV for compatible Xclipse |
-| Logging | Regular app log capture | Optional **Logging**, off by default; original **Send log** retained with added session details |
+| Logging | Regular app log capture | R1.1 disables automatic app logging. **Send log** can share existing logs and driver status. |
 
-The original Revolution launcher layout, touch controls, controller mapping screen and graphics controls are retained. Its existing PT-BR switch is replaced with Logging; game language is fixed to English. Interface refinements also reuse button artwork, collect statistics in the background and stop unnecessary polling when panels are hidden. See the [release history](#release-history) for changes in each version.
+The launcher uses Revolution’s layout, touch controls, controller mappings and graphics controls. The game language is set to English. R1.1 uses the original touch drawing and game statistics polling from Trace 2, with the smaller adjustable statistics panel and shared STORM 2/3 menus. See the [release history](#release-history) for changes in each version.
 
 ## Requirements
 
@@ -73,7 +73,7 @@ Copy the complete extracted disc folder; selecting an executable alone is not en
 - **Return to the launcher:** wait for the game's save indicator to finish, then choose **Return to launcher** and confirm. Wait for **Closing game…** to finish before managing saves. Exiting does not create a manual save.
 - **Export or back up saves:** open **More options → Saves**. Export reads your current save without changing it. Backup restoration is blocked while the game is running or the bundled 100% save is active. The bundled STORM R 100% save is preserved.
 - **Fill the display:** **Fit** keeps the full image, **Stretch** changes its proportions, and **Crop** fills the display by cutting off edges while keeping proportions. Crop does not expand the game's camera view.
-- **Collect a log:** enable **Logging**, restart the game, reproduce the issue, then use the original **Send log** link. App and session details are attached automatically.
+- **Share an existing log:** tap **Send log** in the launcher footer and choose where to share the available files.
 
 ## GPU drivers
 
@@ -96,7 +96,7 @@ Additional PanVK/RADV packages are downloaded separately. Successful import does
 - **[GitHub releases](https://github.com/XHYN-PH/STORM-R-DROID/releases)** — APK downloads and release notes.
 - **[Report an issue](https://github.com/XHYN-PH/STORM-R-DROID/issues)** — describe what happened and how to reproduce it.
 
-For bug reports, include your phone model, Android version, app version, GPU driver and the affected game mode or scene. If possible, attach a log collected using **Logging → restart game → reproduce issue → Send log**.
+For bug reports, include your phone model, Android version, app version, GPU driver and the affected game mode or scene. Include any relevant files available under **Send log**.
 
 ## Release history
 

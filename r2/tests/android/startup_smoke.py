@@ -9,6 +9,7 @@ tools=Path(os.environ['RUNNER_TEMP'])/'r1-tools'
 adb=str(Path(os.environ['ANDROID_HOME'])/'platform-tools/adb')
 package='com.naruto.storm4'
 verify_android_trace=os.environ.get('VERIFY_ANDROID_TRACE')=='true'
+diagnostic=os.environ.get('STARTUP_TEST')=='true'
 def command(*args,check=True,timeout=35):
     return subprocess.run([adb,*map(str,args)],stdout=subprocess.PIPE,stderr=subprocess.STDOUT,text=True,check=check,timeout=timeout).stdout
 
@@ -41,7 +42,12 @@ for version,file in [('R2','R2-ci-only.apk')]:
             command('install','--no-incremental','-t','-r',tools/'R2-tests.apk',timeout=90)
         command('shell','am','force-stop',package)
         command('shell','appops','set',package,'MANAGE_EXTERNAL_STORAGE','allow')
-        command('shell','mkdir','-p',f'/data/data/{package}/shared_prefs',f'/sdcard/Android/data/{package}/files/r2-empty-game')
+        external=f'/sdcard/Android/data/{package}/files'
+        command('shell','mkdir','-p',f'/data/data/{package}/shared_prefs',f'{external}/r2-empty-game')
+        if not diagnostic:
+            previous_log=tools/'previous-naruto.log'
+            previous_log.write_text('Existing renderer log fixture\n')
+            command('push',previous_log,f'{external}/naruto.log')
         prefs=tools/'naruto.xml';prefs.write_text("<?xml version='1.0' encoding='utf-8' standalone='yes' ?><map><boolean name='logging_enabled' value='true'/><boolean name='menu_stats' value='true'/><int name='menu_screen_hz' value='0'/><int name='framegen_playing' value='1'/><float name='shadow_emblem_x_v2' value='24.0'/><float name='shadow_emblem_y_v2' value='24.0'/></map>")
         command('push',prefs,f'/data/data/{package}/shared_prefs/naruto.xml')
         uid=command('shell','stat','-c','%u',f'/data/data/{package}').strip()
@@ -49,22 +55,26 @@ for version,file in [('R2','R2-ci-only.apk')]:
         command('shell','chown','-R',f'{uid}:{uid}',f'/data/data/{package}/shared_prefs')
         command('shell','restorecon','-RF',f'/data/data/{package}/shared_prefs',check=False)
         command('logcat','-c')
-        start=command('shell','am','start','-W','-n',package+'/com.naruto.port.NarutoActivity','--es','module','revolution','--es','gameDirectory',f'/sdcard/Android/data/{package}/files/r2-empty-game')
+        start=command('shell','am','start','-W','-n',package+'/com.naruto.port.NarutoActivity','--es','module','revolution','--es','gameDirectory',f'{external}/r2-empty-game')
         (result/f'{version}-start.txt').write_text(start);notice(version+' actual activity',start)
         time.sleep(5)
         pid=assert_alive();log=read_log(version)
-        assert 'Running main function SDL_main' in log,'The native SDL entry point did not start.'
-        if os.environ.get('STARTUP_TEST')=='true':
-            assert pid.isdigit(),'Unexpected game process identity'
-            maps=command('shell','cat',f'/proc/{pid}/maps')
-            assert 'librevolution.so' in maps,'The actual Revolution engine was not mapped.'
-            assert 'libxhynlog.so' not in maps,'Diagnostic game process loaded the native log-interception helper.'
-            tasks=command('shell','ls',f'/proc/{pid}/task').split()
-            names=[]
-            for task in tasks:
-                if task.isdigit():names.append(command('shell','cat',f'/proc/{pid}/task/{task}/comm',check=False).strip())
-            assert not any(name.startswith('STORM native st') for name in names),'Diagnostic game process started the added native-statistics worker.'
-            notice('Original startup profile','PASS: actual Revolution engine loaded; native log-interception library and added JNI worker absent from :game.')
+        assert pid.isdigit(),'Unexpected game process identity'
+        maps=command('shell','cat',f'/proc/{pid}/maps')
+        assert 'librevolution.so' in maps,'The actual Revolution engine was not mapped.'
+        assert ('libxhynlog.so' in maps) != diagnostic,'The game loaded an unexpected logging policy.'
+        tasks=command('shell','ls',f'/proc/{pid}/task').split()
+        names=[command('shell','cat',f'/proc/{pid}/task/{task}/comm',check=False).strip() for task in tasks if task.isdigit()]
+        assert not any(name.startswith('STORM native st') for name in names),'The game started the added native-statistics worker.'
+        if diagnostic:
+            assert 'Running main function SDL_main' in log,'The native SDL entry point did not start.'
+        else:
+            assert command('shell','readlink',f'/proc/{pid}/fd/2').strip()=='/dev/null','The game did not suppress its stderr stream.'
+            assert 'Running main function SDL_main' not in log,'The old logging preference re-enabled an app log.'
+            assert command('shell','cat',f'{external}/naruto.log')==previous_log.read_text(),'The launch changed a previously saved renderer log.'
+            files=set(command('shell','ls','-1',external).splitlines())
+            assert not files.intersection({'xenia.log','plume_stderr.log','exit_reasons.txt','tombstone.pb','session-details.txt'}),'The launch wrote an automatic log attachment.'
+            notice('Automatic log capture','PASS: the real game process suppressed logs and preserved an existing renderer log with a legacy enabled preference.')
         if version=='R2':
             hierarchy=dump_menu('R2-native-loader.xml')
             messages=[node.get('text','') for node in hierarchy.iter('node')]
@@ -95,10 +105,14 @@ for version,file in [('R2','R2-ci-only.apk')]:
             encoded=base64.b64encode(preview.read_bytes()).decode()
             parts=[encoded[i:i+3000] for i in range(0,len(encoded),3000)]
             for index,part in enumerate(parts,1):notice(f'R2 preview native-dialog {index:02d}/{len(parts):02d}',part)
-            session=command('shell','cat',f'/data/data/{package}/files/r2-last-session.txt')
-            assert 'App: STORM R R1' in session and 'Last foreground Android display rate:' in session,'Real game activity did not capture the new session metadata.'
-            (result/'R2-session-details.txt').write_text(session)
-            notice('R2 session evidence','PASS: real game-activity session version and display snapshot recorded.')
+            if diagnostic:
+                session=command('shell','cat',f'/data/data/{package}/files/r2-last-session.txt')
+                assert 'App: STORM R R1' in session and 'Last foreground Android display rate:' in session,'Real game activity did not capture the new session metadata.'
+                (result/'R2-session-details.txt').write_text(session)
+                notice('R2 session evidence','PASS: real game-activity session version and display snapshot recorded.')
+            else:
+                internal=set(command('shell','ls','-1',f'/data/data/{package}/files').splitlines())
+                assert 'r2-last-session.txt' not in internal,'The game saved new session metadata.'
             assert_alive();log=read_log(version)
         assert not re.search(r'AndroidRuntime: Process: com\.naruto\.storm4:game',log),'AndroidRuntime reported an uncaught game exception.'
         notice(version+' startup result','PASS: actual :game process alive, SDL native main reached'+(', native missing-game-file dialog reached without the Java startup crash' if version=='R2' else ''))

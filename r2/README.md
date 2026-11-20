@@ -1,6 +1,6 @@
-# Build STORM R R1
+# Build STORM R R1.1
 
-This repository adapts the retained STORM 3 R1–R2.4 customization modules to the pinned STORM R v1.1.11 APK. The historical `r1` and `r2` directory/package names are build internals; the installed app is **STORM R R1** (`com.naruto.storm4`, version code **122**).
+This repository adapts the retained STORM 3 R1–R2.4 customization modules to the pinned STORM R v1.1.11 APK. The regular build is **STORM R R1.1** (`com.naruto.storm4`, version code **122**). It disables automatic app logging and uses the original game startup path verified in the Trace 2 gameplay test.
 
 ## Dependencies
 

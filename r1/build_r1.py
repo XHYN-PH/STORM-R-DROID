@@ -25,7 +25,7 @@ def digest(path):
 
 def build(args):
     compatibility_profile = args.startup_test or args.turnip_trace
-    version_name = 'R1-startup-test2' if compatibility_profile else 'R1'
+    version_name = 'R1-startup-test2' if compatibility_profile else 'R1.1'
     if args.turnip_trace:
         version_name = crash_trace.VERSION
     # Equal version codes permit installing either test or R1 over the other without deleting data.
@@ -85,21 +85,18 @@ def build(args):
         run(sys.executable, r2/'compile_runtime.py', '--android-jar', args.android_jar,
             '--build-tools', args.build_tools, '--upstream', original, '--apktool', args.apktool)
         run(sys.executable, r2/'customize.py', decoded)
-        if compatibility_profile:
-            sys.path.insert(0, str(r2))
-            import startup_test
-            startup_test.apply(reference, decoded)
-        run(sys.executable, r2/'verify_linkage.py', decoded)
         sys.path.insert(0, str(r2))
-        import overlay_patches
-        if compatibility_profile:
-            startup_test.verify(reference, decoded)
-        else:
-            overlay_patches.verify_stock(reference, decoded)
+        import startup_test
+        startup_test.apply(reference, decoded, diagnostic=compatibility_profile)
+        if not compatibility_profile:
+            import disable_logging
+            disable_logging.apply(decoded)
+            verification_version.append('--disable-logging')
+        run(sys.executable, r2/'verify_linkage.py', decoded)
+        startup_test.verify(reference, decoded, diagnostic=compatibility_profile)
         controller = Path('com/naruto/port/ControllerMapActivity.smali')
         if (reference/'smali'/controller).read_bytes() != (decoded/'smali'/controller).read_bytes():
             raise ValueError('The stock controller mapping screen changed')
-        verification_version = ['--version-name', version_name, '--version-code', str(version_code)]
     if args.turnip_trace:
         crash_trace.apply(decoded)
         verification_version.append('--turnip-trace')
@@ -127,7 +124,7 @@ def build(args):
                    'host_logging_assertions': 85, 'android_runtime_tested': False})
     (out.parent/'build-report.json').write_text(json.dumps(report, indent=2, ensure_ascii=False)+'\n')
     (out.parent/'SHA256SUMS').write_text(digest(out)+'  '+out.name+'\n')
-    print('R1 APK built and signed:', out)
+    print('STORM R APK built and signed:', out)
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description=__doc__)

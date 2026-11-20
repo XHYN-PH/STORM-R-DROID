@@ -58,26 +58,6 @@ public final class R2Instrumentation extends Instrumentation {
         for (View view: views) if (view instanceof TextView && matchesText(text,((TextView)view).getText())) return true;
         return false;
     }
-    private View findLoggingSwitch(List<View> views) {
-        for (View view: views) {
-            if (!(view instanceof TextView) || !matchesText("Logging",((TextView)view).getText())) continue;
-            View current=view;
-            while (current.getParent() instanceof ViewGroup) {
-                current=(View)current.getParent();
-                List<View> children=new ArrayList<>(); collect(current, children);
-                for (View child:children) if (child.getClass().getName().equals("a.v0")) return child;
-            }
-        }
-        return null;
-    }
-    private void touch(final View view) {
-        runOnMainSync(new Runnable() { public void run() {
-            long time=SystemClock.uptimeMillis();
-            MotionEvent down=MotionEvent.obtain(time,time,MotionEvent.ACTION_DOWN,5,5,0);
-            MotionEvent up=MotionEvent.obtain(time,time+10,MotionEvent.ACTION_UP,5,5,0);
-            view.dispatchTouchEvent(down); view.dispatchTouchEvent(up); down.recycle(); up.recycle();
-        }});
-    }
     private String read(File file) throws Exception {
         ByteArrayOutputStream out=new ByteArrayOutputStream();
         try (FileInputStream in=new FileInputStream(file)) {
@@ -130,7 +110,8 @@ public final class R2Instrumentation extends Instrumentation {
         check(hasText(views,"More options"),"Stock launcher contains one compact More options card");
         android.graphics.drawable.Drawable icon=context.getApplicationInfo().loadIcon(context.getPackageManager());android.graphics.Bitmap iconImage=android.graphics.Bitmap.createBitmap(64,64,android.graphics.Bitmap.Config.ARGB_8888);icon.setBounds(0,0,64,64);icon.draw(new android.graphics.Canvas(iconImage));check(android.graphics.Color.alpha(iconImage.getPixel(0,0))==0&&android.graphics.Color.alpha(iconImage.getPixel(32,32))>0,"Circular app icon has transparent corners and an opaque center");iconImage.recycle();
         check(Class.forName("a.g0",true,loader).getDeclaredMethod("setValues",float[].class)!=null,"Patched stock statistics class verifies on Android");
-        testSessionDetailsAndClosing(context,loader,false);
+        testStockLogSharing(context);
+        testClosing(context,loader);
         testDriverSupport(context,loader);
         testNativeSampling(context,loader);
         View display=null;for(View v:views)if(v instanceof TextView&&"Display".contentEquals(((TextView)v).getText()))display=v;
@@ -141,7 +122,7 @@ public final class R2Instrumentation extends Instrumentation {
         screenshot(context,"display");
         List<android.view.accessibility.AccessibilityNodeInfo> done=root.findAccessibilityNodeInfosByText("Done");check(!done.isEmpty(),"Display has a Done action");android.graphics.Rect doneBounds=new android.graphics.Rect();done.get(0).getBoundsInScreen(doneBounds);android.util.DisplayMetrics metrics=context.getResources().getDisplayMetrics();check(doneBounds.top>=0&&doneBounds.bottom<=metrics.heightPixels&&doneBounds.height()>=Math.round(metrics.density*32),"Display Done action stays visible at the configured font scale");check(done.get(0).performAction(android.view.accessibility.AccessibilityNodeInfo.ACTION_CLICK),"Stock settings dialog closes normally");waitForIdleSync();
         testSaveFiles(context,loader);
-        testOverlays(context,loader);
+        testStatistics(context,loader);
         Class<?> math=Class.forName("com.naruto.r2.GameHooks",true,loader);
         check(Math.abs(((Float)math.getMethod("cropScale",float.class,float.class,int.class).invoke(null,2400f,1080f,100))-1.25f)<.001f,"Proportional crop uses equal scale for both dimensions");
         testModernMenu(context,loader);
@@ -335,8 +316,48 @@ public final class R2Instrumentation extends Instrumentation {
             runOnMainSync(()->{if(frame[0]!=null&&frame[0].getParent() instanceof ViewGroup)((ViewGroup)frame[0].getParent()).removeView(frame[0]);});
         }
     }
-    private void testSessionDetailsAndClosing(Context context,ClassLoader loader,boolean summaryOnly)throws Exception {
-        Class<?> details=Class.forName("com.naruto.r2.SessionDetails",true,loader),exit=Class.forName("com.naruto.r2.ExitFeedback",true,loader);
+    private void testStockLogSharing(Context context) throws Exception {
+        File external = context.getExternalFilesDir(null);
+        File[] files = {new File(external, "naruto.log"), new File(external, "session-details.txt"),
+            new File(external, "tombstone.pb")};
+        byte[][] previous = new byte[files.length][];
+        for (int i = 0; i < files.length; i++) {
+            if (files[i].isFile()) previous[i] = java.nio.file.Files.readAllBytes(files[i].toPath());
+        }
+        java.util.concurrent.atomic.AtomicReference<Intent> chooser = new java.util.concurrent.atomic.AtomicReference<>();
+        ActivityMonitor monitor = new ActivityMonitor() {
+            @Override public ActivityResult onStartActivity(Intent intent) {
+                if (!Intent.ACTION_CHOOSER.equals(intent.getAction())) return null;
+                chooser.set(intent);
+                return new ActivityResult(Activity.RESULT_CANCELED, null);
+            }
+        };
+        addMonitor(monitor);
+        try {
+            for (File file : files) write(file, "Existing share fixture\n");
+            runOnMainSync(() -> {
+                try { launcher.getClass().getMethod("r", boolean.class).invoke(launcher, false); }
+                catch (ReflectiveOperationException error) { throw new IllegalStateException(error); }
+            });
+            waitForIdleSync();
+            check(chooser.get() != null, "Stock Send log opens its chooser for an existing log");
+            Intent payload = (Intent)chooser.get().getParcelableExtra(Intent.EXTRA_INTENT);
+            List<android.net.Uri> attachments = payload.getParcelableArrayListExtra(Intent.EXTRA_STREAM);
+            check(attachments.stream().anyMatch(uri -> "naruto.log".equals(uri.getLastPathSegment())),
+                "An existing renderer log can still be shared");
+            check(attachments.stream().noneMatch(uri -> "session-details.txt".equals(uri.getLastPathSegment())
+                || "tombstone.pb".equals(uri.getLastPathSegment())), "The stock share excludes old diagnostic attachments");
+            check("Existing share fixture\n".equals(read(files[1])), "Send log does not rewrite a previous session report");
+        } finally {
+            removeMonitor(monitor);
+            for (int i = 0; i < files.length; i++) {
+                if (previous[i] == null) java.nio.file.Files.deleteIfExists(files[i].toPath());
+                else java.nio.file.Files.write(files[i].toPath(), previous[i]);
+            }
+        }
+    }
+    private void testSessionDetails(Context context,ClassLoader loader,boolean summaryOnly)throws Exception {
+        Class<?> details=Class.forName("com.naruto.r2.SessionDetails",true,loader);
         SharedPreferences resolutionPrefs=context.getSharedPreferences("naruto",0);
         boolean hadResolution=resolutionPrefs.contains("menu_resolution_v4"),hadLegacyResolution=resolutionPrefs.contains("menu_resolution_v5");
         int oldResolution=resolutionPrefs.getInt("menu_resolution_v4",1),oldLegacyResolution=resolutionPrefs.getInt("menu_resolution_v5",1);
@@ -396,6 +417,9 @@ public final class R2Instrumentation extends Instrumentation {
             if(monitorAdded)removeMonitor(monitor);SharedPreferences.Editor restore=prefs.edit();if(hadDirectory)restore.putString("r23_private_test",oldDirectory);else restore.remove("r23_private_test");if(hadToken)restore.putString("r23_token_test",oldToken);else restore.remove("r23_token_test");restore.commit();
             for(int i=0;i<files.length;i++){if(previous[i]==null)java.nio.file.Files.deleteIfExists(files[i].toPath());else java.nio.file.Files.write(files[i].toPath(),previous[i]);}
         }
+    }
+    private void testClosing(Context context, ClassLoader loader) throws Exception {
+        Class<?> exit=Class.forName("com.naruto.r2.ExitFeedback",true,loader);
         File marker=new File(context.getFilesDir(),"r2-exit.pending"),lockFile=new File(context.getFilesDir(),"r2-game.lock");
         try(java.io.RandomAccessFile file=new java.io.RandomAccessFile(lockFile,"rw")) {
             java.nio.channels.FileLock lock=file.getChannel().lock();
@@ -545,7 +569,8 @@ public final class R2Instrumentation extends Instrumentation {
         View send=named(views,"Send log");check(send!=null&&send.hasOnClickListeners(),"Stock Send log remains connected");
         check(hasText(views,"Modified and Translated by XHYN_PH")&&!hasText(views,"PT-BR"),"English footer and language policy are retained");
         screenshot(context,"launcher");
-        testSessionDetailsAndClosing(context,loader,summaryOnly);
+        testSessionDetails(context,loader,summaryOnly);
+        testClosing(context,loader);
         testSaveFiles(context,loader);
         testSharedPresentation(context,loader,views);
         testStatistics(context,loader);
@@ -628,8 +653,8 @@ public final class R2Instrumentation extends Instrumentation {
                 result.putString("stream","R2_ANDROID_RESULT=PASS assertions="+assertions+" profile=original-startup\n");
                 finish(Activity.RESULT_OK,result);return;
             }
-            check("R1".equals(context.getPackageManager().getPackageInfo(context.getPackageName(),0).versionName),"Installed version is R1");
-            check(!originalLogging,"Logging defaults to off on a fresh install");
+            check("R1.1".equals(version),"Installed version is R1.1");
+            prefs.edit().putBoolean("logging_enabled",true).commit();
             ClassLoader loader=context.getClassLoader();
             Class<?> control=Class.forName("com.naruto.port.LoggingControl",true,loader);
             Method initialize=control.getMethod("initialize",Context.class);
@@ -640,24 +665,15 @@ public final class R2Instrumentation extends Instrumentation {
             launcher=startActivitySync(intent);
             final List<View> views=new ArrayList<>();
             runOnMainSync(new Runnable(){public void run(){collect(launcher.getWindow().getDecorView(),views);}});
-            check(hasText(views,"Logging"),"English Logging control is present");
+            check(!hasText(views,"Logging")&&!hasText(views,"Capture app logs"),"Automatic logging and its launcher switch are removed");
             View stockLog=named(views,"Send log");check(stockLog!=null&&stockLog.getVisibility()==View.VISIBLE&&stockLog.hasOnClickListeners(),"Original Send log action remains visible and connected");
             check(hasText(views,"Modified and Translated by XHYN_PH"),"YouTube footer has the requested text");
             check(!hasText(views,"PT-BR")&&!hasText(views,"Portuguese text"),"PT-BR option is absent");
             verifyR2(context,loader,views);
-            View logging=findLoggingSwitch(views);check(logging!=null,"Logging has an interactive switch");
-            Field state=logging.getClass().getField("a");
-            check(!state.getBoolean(logging),"Logging switch renders off initially");
-            touch(logging);
-            check(prefs.getBoolean("logging_enabled",false),"Turning Logging on persists its setting");
-            check(state.getBoolean(logging),"Logging switch reflects its enabled state");
             Class<?> appLog=Class.forName("com.naruto.port.AppLog",true,loader);
             Method emit=appLog.getMethod("i",String.class,String.class);
             Method trace=appLog.getMethod("stackTrace",Throwable.class);
             Method stderr=appLog.getMethod("println",java.io.PrintStream.class,String.class);
-            emit.invoke(null,"R1_NATIVE_TEST","R1_LOGGING_ON_MARKER");
-            trace.invoke(null,new RuntimeException("R1_STACK_ON_MARKER"));
-            stderr.invoke(null,System.err,"R1_STDERR_ON_MARKER");
             Class<?> sdl=Class.forName("org.libsdl.app.SDL",true,loader);
             Method load=sdl.getMethod("loadLibrary",String.class,Context.class);
             progress("Loading the actual upstream ffmpeg/revolution libraries without starting gameplay");
@@ -665,11 +681,8 @@ public final class R2Instrumentation extends Instrumentation {
             Method install=control.getDeclaredMethod("nativeInstall");install.setAccessible(true);
             check(Boolean.TRUE.equals(install.invoke(null)),"Logging hooks install against the actual ARM64 engine libraries");
             check(Boolean.TRUE.equals(install.invoke(null)),"Installing native logging hooks again is safe");
-            touch(logging);
-            check(!prefs.getBoolean("logging_enabled",true),"Turning Logging off persists its setting");
             Method earlyCutoff=control.getDeclaredMethod("nativeEarlyCutoff");earlyCutoff.setAccessible(true);
-            check(Boolean.TRUE.equals(earlyCutoff.invoke(null)),"Logging off selects the early cutoff in the engine ABI");
-            check(!state.getBoolean(logging),"Logging switch reflects its disabled state");
+            check(Boolean.TRUE.equals(earlyCutoff.invoke(null)),"An old enabled preference cannot bypass the engine logging cutoff");
             emit.invoke(null,"R1_NATIVE_TEST","R1_LOGGING_OFF_MARKER");
             trace.invoke(null,new RuntimeException("R1_STACK_OFF_MARKER"));
             stderr.invoke(null,System.err,"R1_STDERR_OFF_MARKER");

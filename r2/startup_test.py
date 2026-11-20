@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 # Copyright (c) 2026 XHYN_PH. SPDX-License-Identifier: MIT
-"""A reversible diagnostic build with the original engine-facing startup path."""
+"""Keep the original engine-facing startup path with the shared menu styling."""
 from pathlib import Path
 import re
 from xml.etree import ElementTree as ET
@@ -44,18 +44,19 @@ def java_logging_only(create):
     return create.replace(native, '')
 
 
-def apply(reference, decoded):
+def apply(reference, decoded, *, diagnostic=True):
     original = methods((reference / GAME).read_text())
     game = (decoded / GAME).read_text()
-    create = java_logging_only(original[CREATE])
+    create = java_logging_only(original[CREATE]) if diagnostic else original[CREATE]
     super_call = '    invoke-super {p0, p1}, Lorg/libsdl/app/SDLActivity;->onCreate(Landroid/os/Bundle;)V'
     if create.count(super_call) != 1:
         raise ValueError('Original SDL creation changed')
     create = create.replace(super_call, super_call + '\n' + LOCK)
     # Restore presentation settings without starting added native polling/refresh hooks.
-    create = create.replace('    return-void', PRESENTATION + '\n' + METADATA + '\n    return-void')
+    ready = PRESENTATION + ('\n' + METADATA if diagnostic else '')
+    create = create.replace('    return-void', ready + '\n    return-void')
     # Avoid recording a failed save-lock attempt as a running game session.
-    create = create.replace(PRESENTATION + '\n' + METADATA + '\n    return-void\n    :startup_test_lock_ready', '    return-void\n    :startup_test_lock_ready')
+    create = create.replace(ready + '\n    return-void\n    :startup_test_lock_ready', '    return-void\n    :startup_test_lock_ready')
     game = replace(game, CREATE, create)
     game = replace(game, DESTROY, original[DESTROY].replace('    return-void', STOP + '\n    return-void'))
     game = replace(game, REFRESH, original[REFRESH])
@@ -63,15 +64,19 @@ def apply(reference, decoded):
         signature = '.method public ' + name + '()V'
         body = signature + '\n    .locals 0\n'
         body += '    invoke-super {p0}, Lorg/libsdl/app/SDLActivity;->' + name + '()V\n'
-        body += '    invoke-static {p0}, Lcom/naruto/r2/SessionDetails;->' + helper + '(Lcom/naruto/port/NarutoActivity;)V\n'
+        if diagnostic:
+            body += '    invoke-static {p0}, Lcom/naruto/r2/SessionDetails;->' + helper + '(Lcom/naruto/port/NarutoActivity;)V\n'
         body += '    return-void\n.end method'
         game = replace(game, signature, body)
-    game = replace(game, '.method public onWindowFocusChanged(Z)V', '''.method public onWindowFocusChanged(Z)V
+    focus = '''.method public onWindowFocusChanged(Z)V
     .locals 0
     invoke-super {p0, p1}, Lorg/libsdl/app/SDLActivity;->onWindowFocusChanged(Z)V
     invoke-static {p0, p1}, Lcom/naruto/r2/SessionDetails;->focus(Lcom/naruto/port/NarutoActivity;Z)V
     return-void
-.end method''')
+.end method'''
+    if not diagnostic:
+        focus = re.sub(r'(?m)^    invoke-static .*Lcom/naruto/r2/SessionDetails;[^\n]+\n', '', focus)
+    game = replace(game, '.method public onWindowFocusChanged(Z)V', focus)
     # Keep the existing wrappers that apply Crop and touch visibility from modern menus.
     (decoded / GAME).write_text(game)
 
@@ -103,22 +108,23 @@ def apply(reference, decoded):
     (decoded / 'smali/a/l0.smali').write_text(touch)
     # Retain the shared statistics UI, configuration writer and Material theme from
     # customize.py. Test 1 unnecessarily reverted these visible, working features.
-    (decoded / 'assets/startup-test.txt').write_text(
-        'STORM R original-startup compatibility test 2\n'
-        'Original game JNI polling, refresh selection and touch drawing.\n'
-        'STORM 2/3 menu styling, adjustable statistics and display settings retained.\n'
-        'Native file-log interception is bypassed.\n'
-        'Native logging follows the original app in this diagnostic build.\n'
-        'Not a verified gameplay fix. No save or preference data is deleted.\n')
-    verify(reference, decoded)
+    if diagnostic:
+        (decoded / 'assets/startup-test.txt').write_text(
+            'STORM R original-startup compatibility test 2\n'
+            'Original game JNI polling, refresh selection and touch drawing.\n'
+            'STORM 2/3 menu styling, adjustable statistics and display settings retained.\n'
+            'Native file-log interception is bypassed.\n'
+            'Native logging follows the original app in this diagnostic build.\n'
+            'Not a verified gameplay fix. No save or preference data is deleted.\n')
 
 
-def verify(reference, decoded):
+def verify(reference, decoded, *, diagnostic=True):
     original = methods((reference / GAME).read_text())
     game = methods((decoded / GAME).read_text())
     body = game[CREATE].replace('\n' + LOCK, '').replace(PRESENTATION + '\n', '').replace(METADATA + '\n', '')
-    if body != java_logging_only(original[CREATE]):
-        raise AssertionError('Startup test changed original game initialization')
+    expected = java_logging_only(original[CREATE]) if diagnostic else original[CREATE]
+    if body != expected:
+        raise AssertionError('Original game initialization changed')
     if game[REFRESH] != original[REFRESH]:
         raise AssertionError('Startup test changed original refresh selection')
     if game[DESTROY].replace(STOP + '\n', '') != original[DESTROY]:

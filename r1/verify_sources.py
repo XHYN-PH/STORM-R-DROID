@@ -33,7 +33,7 @@ def method(text, signature):
     require(found is not None,signature)
     return found.group()
 
-def verify(original, decoded, version_name="R1", version_code=122, turnip_trace=False):
+def verify(original, decoded, version_name="R1", version_code=122, turnip_trace=False, disable_logging=False):
     require((decoded/crash_trace.MARKER).is_file() == turnip_trace, 'Unexpected crash reporting profile')
     with ZipFile(original) as apk:
         for name in apk.namelist():
@@ -70,10 +70,19 @@ def verify(original, decoded, version_name="R1", version_code=122, turnip_trace=
     launcher=(smali/'com/naruto/port/LauncherActivity.smali').read_text()
     provider=(smali/'com/naruto/port/LogProvider.smali').read_text()
     share_worker=(smali/'a/o.smali').read_text()
-    require(('"tombstone.pb"' in provider) != turnip_trace,'Unexpected raw crash attachment policy')
-    require(('ApplicationExitInfo;->getTraceInputStream()' in share_worker) != turnip_trace,'Unexpected raw crash dump copy')
+    raw_crash_dump = not (turnip_trace or disable_logging)
+    require(('"tombstone.pb"' in provider) == raw_crash_dump,'Unexpected raw crash attachment policy')
+    require(('ApplicationExitInfo;->getTraceInputStream()' in share_worker) == raw_crash_dump,'Unexpected raw crash dump copy')
     require('"menu_ptbr"' not in launcher,'PT-BR control still reachable')
-    require('\"logging_enabled\"' in launcher,'Missing logging switch')
+    require(('"logging_enabled"' in launcher) != disable_logging,'Unexpected logging switch')
+    if disable_logging:
+        control=(smali/'com/naruto/port/LoggingControl.smali').read_text()
+        require('"logging_enabled"' not in control,'An old preference can still enable logging')
+        require('"exit_reasons.txt"' not in share_worker,'Exit history still collected automatically')
+        require('"session-details.txt"' not in provider,'Extra session attachment remains')
+        require(not (smali/'com/naruto/port/LoggingToggleListener.smali').exists(),'Unused logging switch listener remains')
+        require(not (smali/'com/naruto/r2/SessionDetails.smali').exists(),'Extra session capture code remains')
+        require('.method public final r(Z)V' in launcher,'Stock Send log method is missing')
     require('"Modified and Translated by XHYN_PH"' in launcher,'Missing R1 author footer')
     combined='\n'.join(p.read_text() for p in smali.rglob('*.smali'))
     require('"https://youtube.com/@xhyn_ph"' in combined,'Incorrect YouTube URL')
@@ -113,4 +122,5 @@ if __name__=='__main__':
     parser.add_argument('--decoded',type=Path,required=True)
     parser.add_argument('--version-name',default='R1');parser.add_argument('--version-code',type=int,default=122)
     parser.add_argument('--turnip-trace', action='store_true')
-    args=parser.parse_args();verify(args.original,args.decoded,args.version_name,args.version_code,args.turnip_trace)
+    parser.add_argument('--disable-logging', action='store_true')
+    args=parser.parse_args();verify(args.original,args.decoded,args.version_name,args.version_code,args.turnip_trace,args.disable_logging)
