@@ -27,7 +27,7 @@ public final class LauncherUi {
     }
     private static void display(LauncherActivity a){LinearLayout body=dialogBody(a);
         body.addView(ModernUi.text(a,"Graphics changes apply the next time the game starts.",12,ModernUi.MUTED));
-        body.addView(ModernUi.text(a,"Frame generation can use a different upscaling path. Send log reports the path observed by the renderer.",12,ModernUi.MUTED));
+        body.addView(ModernUi.text(a,"Frame generation can use a different upscaling path.",12,ModernUi.MUTED));
         body.addView(dialogToggle(a,"Opening video","Show the launcher video","r2_video",true));
         body.addView(ModernUi.action(a,"Screen mode",GameMenu.screenName(GameHooks.prefs(a).getInt("r2_screen",GameHooks.prefs(a).getInt("menu_screen_v3",0))),()->screen(a)));
         body.addView(ModernUi.action(a,"Brightness",null,()->gamma(a)));

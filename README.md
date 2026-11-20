@@ -17,7 +17,7 @@ STORM R is my modified English edition of the [original native port](https://git
 
 The focus is a cleaner interface, more useful Android options and less unnecessary work in the menus and overlays. Performance and compatibility still depend on the phone, driver and game scene.
 
-**Turnip compatibility:** [Trace 2](https://github.com/XHYN-PH/STORM-R-DROID/releases/tag/R1-turnip-trace2) completed a gameplay session on an Adreno 750 with Turnip Gen8 V39-patched, 1080p and 2× frame generation. R1.1 uses the same startup and menu behavior, with automatic logging disabled.
+**Turnip compatibility.** Trace 2 completed a gameplay session on an Adreno 750 with Turnip Gen8 V39-patched, 1080p and 2× frame generation. R1.1 uses the same startup and menu behavior with automatic logging disabled. [Trace 2 release](https://github.com/XHYN-PH/STORM-R-DROID/releases/tag/R1-turnip-trace2)
 
 ## What changed from the original?
 
