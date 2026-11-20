@@ -1,9 +1,10 @@
 #!/usr/bin/env python3
 # Copyright (c) 2026 XHYN_PH. SPDX-License-Identifier: MIT
-"""Keep the original engine-facing startup path with the shared menu styling."""
+"""Keep the original engine-facing startup path."""
 from pathlib import Path
 import re
 from xml.etree import ElementTree as ET
+from customize import REMEMBER_REFRESH, gameplay_dispatcher, start
 
 GAME = Path('smali/com/naruto/port/NarutoActivity.smali')
 CREATE = '.method public onCreate(Landroid/os/Bundle;)V'
@@ -17,6 +18,8 @@ LOCK = '''    invoke-static/range {p0 .. p0}, Lcom/naruto/r2/GameHooks;->gameSta
     :startup_test_lock_ready'''
 METADATA = '    invoke-static/range {p0 .. p0}, Lcom/naruto/r2/SessionDetails;->start(Lcom/naruto/port/NarutoActivity;)V'
 PRESENTATION = '    invoke-static/range {p0 .. p0}, Lcom/naruto/r2/GameHooks;->presentationReady(Landroid/app/Activity;)V'
+READY = '    invoke-static/range {p0 .. p0}, Lcom/naruto/r2/GameHooks;->gameReady(Landroid/app/Activity;)V'
+CLEANUP = '    invoke-static/range {p0 .. p0}, Lcom/naruto/r2/GameLoop;->destroy(Lcom/naruto/port/NarutoActivity;)V'
 STOP = '    invoke-static/range {p0 .. p0}, Lcom/naruto/r2/GameHooks;->gameStop(Landroid/app/Activity;)V'
 
 
@@ -44,51 +47,49 @@ def java_logging_only(create):
     return create.replace(native, '')
 
 
-def apply(reference, decoded, *, diagnostic=True):
+def apply(reference, decoded, *, optimize_after_startup=False):
     original = methods((reference / GAME).read_text())
     game = (decoded / GAME).read_text()
-    create = java_logging_only(original[CREATE]) if diagnostic else original[CREATE]
+    create = original[CREATE] if optimize_after_startup else java_logging_only(original[CREATE])
     super_call = '    invoke-super {p0, p1}, Lorg/libsdl/app/SDLActivity;->onCreate(Landroid/os/Bundle;)V'
     if create.count(super_call) != 1:
         raise ValueError('Original SDL creation changed')
     create = create.replace(super_call, super_call + '\n' + LOCK)
     # Restore presentation settings without starting added native polling/refresh hooks.
-    ready = PRESENTATION + ('\n' + METADATA if diagnostic else '')
+    ready = READY if optimize_after_startup else PRESENTATION + '\n' + METADATA
     create = create.replace('    return-void', ready + '\n    return-void')
     # Avoid recording a failed save-lock attempt as a running game session.
     create = create.replace(ready + '\n    return-void\n    :startup_test_lock_ready', '    return-void\n    :startup_test_lock_ready')
     game = replace(game, CREATE, create)
-    game = replace(game, DESTROY, original[DESTROY].replace('    return-void', STOP + '\n    return-void'))
+    destroy = original[DESTROY].replace('    return-void', STOP + '\n    return-void')
+    if optimize_after_startup:
+        (decoded / GAME).write_text(replace(game, DESTROY, start(destroy, CLEANUP)))
+        restore_statistics_toggle(decoded)
+        verify(reference, decoded, optimize_after_startup=True)
+        return
+
+    game = replace(game, DESTROY, destroy)
     game = replace(game, REFRESH, original[REFRESH])
     for name, helper in [('onResume', 'resume'), ('onPause', 'pause')]:
         signature = '.method public ' + name + '()V'
         body = signature + '\n    .locals 0\n'
         body += '    invoke-super {p0}, Lorg/libsdl/app/SDLActivity;->' + name + '()V\n'
-        if diagnostic:
-            body += '    invoke-static {p0}, Lcom/naruto/r2/SessionDetails;->' + helper + '(Lcom/naruto/port/NarutoActivity;)V\n'
+        body += '    invoke-static {p0}, Lcom/naruto/r2/SessionDetails;->' + helper + '(Lcom/naruto/port/NarutoActivity;)V\n'
         body += '    return-void\n.end method'
         game = replace(game, signature, body)
-    focus = '''.method public onWindowFocusChanged(Z)V
+    game = replace(game, '.method public onWindowFocusChanged(Z)V', '''.method public onWindowFocusChanged(Z)V
     .locals 0
     invoke-super {p0, p1}, Lorg/libsdl/app/SDLActivity;->onWindowFocusChanged(Z)V
     invoke-static {p0, p1}, Lcom/naruto/r2/SessionDetails;->focus(Lcom/naruto/port/NarutoActivity;Z)V
     return-void
-.end method'''
-    if not diagnostic:
-        focus = re.sub(r'(?m)^    invoke-static .*Lcom/naruto/r2/SessionDetails;[^\n]+\n', '', focus)
-    game = replace(game, '.method public onWindowFocusChanged(Z)V', focus)
+.end method''')
     # Keep the existing wrappers that apply Crop and touch visibility from modern menus.
     (decoded / GAME).write_text(game)
 
     # Keep the original main-thread statistics/preparation scheduling and SDL lookup.
     for name in ['smali/a/H.smali', 'smali/org/libsdl/app/SDLJoystickHandler_API16.smali']:
         (decoded / name).write_bytes((reference / name).read_bytes())
-    menu = decoded / 'smali/com/naruto/r2/GameMenu$1.smali'
-    text = menu.read_text()
-    resume = 'Lcom/naruto/r2/GameLoop;->resume(Lcom/naruto/port/NarutoActivity;)V'
-    if text.count(resume) != 1:
-        raise ValueError('Game-menu statistics callback changed')
-    menu.write_text(text.replace(resume, 'Lcom/naruto/r2/GameHooks;->resumeOriginalStats(Lcom/naruto/port/NarutoActivity;)V'))
+    restore_statistics_toggle(decoded)
 
     # Retain all original touch rendering and editing, with unused typed bridges for menus.
     touch = (reference / 'smali/a/l0.smali').read_text()
@@ -108,27 +109,40 @@ def apply(reference, decoded, *, diagnostic=True):
     (decoded / 'smali/a/l0.smali').write_text(touch)
     # Retain the shared statistics UI, configuration writer and Material theme from
     # customize.py. Test 1 unnecessarily reverted these visible, working features.
-    if diagnostic:
-        (decoded / 'assets/startup-test.txt').write_text(
-            'STORM R original-startup compatibility test 2\n'
-            'Original game JNI polling, refresh selection and touch drawing.\n'
-            'STORM 2/3 menu styling, adjustable statistics and display settings retained.\n'
-            'Native file-log interception is bypassed.\n'
-            'Native logging follows the original app in this diagnostic build.\n'
-            'Not a verified gameplay fix. No save or preference data is deleted.\n')
+    (decoded / 'assets/startup-test.txt').write_text(
+        'STORM R original-startup compatibility test 2\n'
+        'Original game JNI polling, refresh selection and touch drawing.\n'
+        'STORM 2/3 menu styling, adjustable statistics and display settings retained.\n'
+        'Native file-log interception is bypassed.\n'
+        'Native logging follows the original app in this diagnostic build.\n'
+        'Not a verified gameplay fix. No save or preference data is deleted.\n')
+    verify(reference, decoded)
 
 
-def verify(reference, decoded, *, diagnostic=True):
+def restore_statistics_toggle(decoded):
+    menu = decoded / 'smali/com/naruto/r2/GameMenu$1.smali'
+    text = menu.read_text()
+    resume = 'Lcom/naruto/r2/GameLoop;->resume(Lcom/naruto/port/NarutoActivity;)V'
+    if text.count(resume) != 1:
+        raise ValueError('Game-menu statistics callback changed')
+    menu.write_text(text.replace(resume, 'Lcom/naruto/r2/GameHooks;->resumeOriginalStats(Lcom/naruto/port/NarutoActivity;)V'))
+
+
+def verify(reference, decoded, *, optimize_after_startup=False):
     original = methods((reference / GAME).read_text())
     game = methods((decoded / GAME).read_text())
-    body = game[CREATE].replace('\n' + LOCK, '').replace(PRESENTATION + '\n', '').replace(METADATA + '\n', '')
-    expected = java_logging_only(original[CREATE]) if diagnostic else original[CREATE]
+    body = game[CREATE].replace('\n' + LOCK, '')
+    for hook in (PRESENTATION, METADATA, READY):
+        body = body.replace(hook + '\n', '')
+    expected = original[CREATE] if optimize_after_startup else java_logging_only(original[CREATE])
     if body != expected:
         raise AssertionError('Original game initialization changed')
-    if game[REFRESH] != original[REFRESH]:
-        raise AssertionError('Startup test changed original refresh selection')
-    if game[DESTROY].replace(STOP + '\n', '') != original[DESTROY]:
-        raise AssertionError('Startup test changed original SDL shutdown')
+    refresh = start(original[REFRESH], REMEMBER_REFRESH) if optimize_after_startup else original[REFRESH]
+    if game[REFRESH] != refresh:
+        raise AssertionError('Original refresh selection changed')
+    destroy = start(original[DESTROY], CLEANUP) if optimize_after_startup else original[DESTROY]
+    if game[DESTROY].replace(STOP + '\n', '') != destroy:
+        raise AssertionError('Original SDL shutdown changed')
     stretch_hook = '    invoke-static/range {p0 .. p1}, Lcom/naruto/r2/GameHooks;->stockScreen(Landroid/app/Activity;Z)V\n\n'
     if game['.method private applyStretch(Z)V'].replace(stretch_hook, '') != original['.method private applyStretch(Z)V']:
         raise AssertionError('Unexpected native stretch change')
@@ -140,18 +154,26 @@ def verify(reference, decoded, *, diagnostic=True):
     config = '    invoke-static/range {p0 .. p0}, Lcom/naruto/r2/GameHooks;->config(Landroid/app/Activity;)V\n\n'
     if methods((decoded / launcher).read_text())[signature].replace(config, '') != methods((reference / launcher).read_text())[signature]:
         raise AssertionError('Unexpected change to the original configuration writer')
-    for name in ['smali/a/H.smali', 'smali/org/libsdl/app/SDLJoystickHandler_API16.smali']:
-        if (decoded / name).read_bytes() != (reference / name).read_bytes():
-            raise AssertionError('Startup test changed original scheduler/input: ' + name)
+    scheduler = Path('smali/a/H.smali')
+    original_scheduler = (reference / scheduler).read_text()
+    if optimize_after_startup:
+        run = '.method public final run()V'
+        original_scheduler = replace(original_scheduler, run, gameplay_dispatcher(methods(original_scheduler)[run]))
+    if (decoded / scheduler).read_text() != original_scheduler:
+        raise AssertionError('Unexpected change to original startup polling')
+    joystick = Path('smali/org/libsdl/app/SDLJoystickHandler_API16.smali')
+    if not optimize_after_startup and (decoded / joystick).read_bytes() != (reference / joystick).read_bytes():
+        raise AssertionError('Startup test changed original joystick lookup')
     menu = (decoded / 'smali/com/naruto/r2/GameMenu$1.smali').read_text()
     if 'GameLoop;->resume' in menu or 'GameHooks;->resumeOriginalStats' not in menu:
         raise AssertionError('FPS toggle can reactivate the added JNI worker')
-    name = 'smali/a/l0.smali'
-    before = methods((reference / name).read_text())
-    after = methods((decoded / name).read_text())
-    for signature, source in before.items():
-        if after.get(signature) != source:
-            raise AssertionError('Original draw/input method drifted: ' + name + ' ' + signature)
+    if not optimize_after_startup:
+        name = 'smali/a/l0.smali'
+        before = methods((reference / name).read_text())
+        after = methods((decoded / name).read_text())
+        for signature, source in before.items():
+            if after.get(signature) != source:
+                raise AssertionError('Original draw/input method drifted: ' + name + ' ' + signature)
     android = '{http://schemas.android.com/apk/res/android}'
     app = ET.parse(decoded / 'AndroidManifest.xml').getroot().find('application')
     game_activity = next(a for a in app.findall('activity') if a.get(android+'name') == 'com.naruto.port.NarutoActivity')

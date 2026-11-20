@@ -110,19 +110,13 @@ public final class R2Instrumentation extends Instrumentation {
         check(hasText(views,"More options"),"Stock launcher contains one compact More options card");
         android.graphics.drawable.Drawable icon=context.getApplicationInfo().loadIcon(context.getPackageManager());android.graphics.Bitmap iconImage=android.graphics.Bitmap.createBitmap(64,64,android.graphics.Bitmap.Config.ARGB_8888);icon.setBounds(0,0,64,64);icon.draw(new android.graphics.Canvas(iconImage));check(android.graphics.Color.alpha(iconImage.getPixel(0,0))==0&&android.graphics.Color.alpha(iconImage.getPixel(32,32))>0,"Circular app icon has transparent corners and an opaque center");iconImage.recycle();
         check(Class.forName("a.g0",true,loader).getDeclaredMethod("setValues",float[].class)!=null,"Patched stock statistics class verifies on Android");
-        testStockLogSharing(context);
+        testUpdateProvider(context);
         testClosing(context,loader);
         testDriverSupport(context,loader);
         testNativeSampling(context,loader);
-        View display=null;for(View v:views)if(v instanceof TextView&&"Display".contentEquals(((TextView)v).getText()))display=v;
-        check(display!=null,"Stock More options card exposes Display");final View displayButton=display;
-        runOnMainSync(()->displayButton.performClick());waitForIdleSync();
-        android.view.accessibility.AccessibilityNodeInfo root=getUiAutomation().getRootInActiveWindow();
-        check(root!=null&&!root.findAccessibilityNodeInfosByText("Opening video").isEmpty(),"Display opens a stock dialog containing the native video switch");
-        screenshot(context,"display");
-        List<android.view.accessibility.AccessibilityNodeInfo> done=root.findAccessibilityNodeInfosByText("Done");check(!done.isEmpty(),"Display has a Done action");android.graphics.Rect doneBounds=new android.graphics.Rect();done.get(0).getBoundsInScreen(doneBounds);android.util.DisplayMetrics metrics=context.getResources().getDisplayMetrics();check(doneBounds.top>=0&&doneBounds.bottom<=metrics.heightPixels&&doneBounds.height()>=Math.round(metrics.density*32),"Display Done action stays visible at the configured font scale");check(done.get(0).performAction(android.view.accessibility.AccessibilityNodeInfo.ACTION_CLICK),"Stock settings dialog closes normally");waitForIdleSync();
+        testSharedPresentation(context,loader,views);
         testSaveFiles(context,loader);
-        testStatistics(context,loader);
+        testOverlays(context,loader);
         Class<?> math=Class.forName("com.naruto.r2.GameHooks",true,loader);
         check(Math.abs(((Float)math.getMethod("cropScale",float.class,float.class,int.class).invoke(null,2400f,1080f,100))-1.25f)<.001f,"Proportional crop uses equal scale for both dimensions");
         testModernMenu(context,loader);
@@ -139,7 +133,7 @@ public final class R2Instrumentation extends Instrumentation {
     }
     private void testShutdownAndLookup(Context context,ClassLoader loader)throws Exception {
         final Throwable[] error=new Throwable[1];final Object[] instance={null};Class<?> game=Class.forName("com.naruto.port.NarutoActivity",true,loader),loop=Class.forName("com.naruto.r2.GameLoop",true,loader),hooks=Class.forName("com.naruto.r2.GameHooks",true,loader);
-        runOnMainSync(()->{try{instance[0]=game.getConstructor().newInstance();android.os.Handler handler=(android.os.Handler)game.getField("statsHandler").get(instance[0]);Runnable stats=(Runnable)game.getField("statsUpdater").get(instance[0]),prepare=(Runnable)game.getField("prepareUpdater").get(instance[0]);handler.postDelayed(stats,60000);handler.postDelayed(prepare,60000);loop.getMethod("pause",game).invoke(null,instance[0]);check(!handler.hasCallbacks(stats)&&!handler.hasCallbacks(prepare),"Game pause cancels both existing polling tasks");check(Boolean.FALSE.equals(loop.getMethod("tick",int.class,android.view.KeyEvent.Callback.class).invoke(null,2,null)),"Unrelated emblem fade task keeps its original path");}catch(Throwable e){error[0]=e;}});if(error[0]!=null)throw new RuntimeException(error[0]);
+        runOnMainSync(()->{try{instance[0]=game.getConstructor().newInstance();check(Boolean.FALSE.equals(loop.getMethod("tick",int.class,android.view.KeyEvent.Callback.class).invoke(null,2,null)),"Unrelated emblem fade task keeps its original path");}catch(Throwable e){error[0]=e;}});if(error[0]!=null)throw new RuntimeException(error[0]);
         java.util.concurrent.CountDownLatch finishEngine=new java.util.concurrent.CountDownLatch(1);Thread engine=new Thread(()->{try{finishEngine.await();}catch(InterruptedException e){Thread.currentThread().interrupt();}},"R2-simulated-SDL-thread");engine.start();
         File lockPath=new File(context.getFilesDir(),"r2-shutdown-test-"+java.util.UUID.randomUUID());java.io.RandomAccessFile file=new java.io.RandomAccessFile(lockPath,"rw");java.nio.channels.FileLock lock=file.getChannel().tryLock();Field lockField=hooks.getDeclaredField("gameLock"),fileField=hooks.getDeclaredField("gameLockFile");lockField.setAccessible(true);fileField.setAccessible(true);Field threadField=Class.forName("org.libsdl.app.SDLActivity",true,loader).getDeclaredField("mSDLThread");threadField.setAccessible(true);Object previousThread=threadField.get(null);
         try{lockField.set(null,lock);fileField.set(null,file);hooks.getField("returnToLauncher").setBoolean(null,false);threadField.set(null,engine);runOnMainSync(()->{try{hooks.getMethod("gameStop",Activity.class).invoke(null,instance[0]);}catch(Throwable e){error[0]=e;}});if(error[0]!=null)throw new RuntimeException(error[0]);check(lock.isValid(),"Save lock remains held while the simulated game thread is alive");finishEngine.countDown();engine.join(5000);long deadline=SystemClock.uptimeMillis()+5000;while(lock.isValid()&&SystemClock.uptimeMillis()<deadline)SystemClock.sleep(20);waitForIdleSync();check(!lock.isValid()&&!engine.isAlive(),"Save lock is released only after the simulated game thread stops");}
@@ -316,40 +310,29 @@ public final class R2Instrumentation extends Instrumentation {
             runOnMainSync(()->{if(frame[0]!=null&&frame[0].getParent() instanceof ViewGroup)((ViewGroup)frame[0].getParent()).removeView(frame[0]);});
         }
     }
-    private void testStockLogSharing(Context context) throws Exception {
+    private void testUpdateProvider(Context context) throws Exception {
         File external = context.getExternalFilesDir(null);
-        File[] files = {new File(external, "naruto.log"), new File(external, "session-details.txt"),
-            new File(external, "tombstone.pb")};
+        File[] files = {new File(external, "naruto.log"), new File(external, "updates/update.apk")};
         byte[][] previous = new byte[files.length][];
         for (int i = 0; i < files.length; i++) {
             if (files[i].isFile()) previous[i] = java.nio.file.Files.readAllBytes(files[i].toPath());
         }
-        java.util.concurrent.atomic.AtomicReference<Intent> chooser = new java.util.concurrent.atomic.AtomicReference<>();
-        ActivityMonitor monitor = new ActivityMonitor() {
-            @Override public ActivityResult onStartActivity(Intent intent) {
-                if (!Intent.ACTION_CHOOSER.equals(intent.getAction())) return null;
-                chooser.set(intent);
-                return new ActivityResult(Activity.RESULT_CANCELED, null);
-            }
-        };
-        addMonitor(monitor);
         try {
-            for (File file : files) write(file, "Existing share fixture\n");
-            runOnMainSync(() -> {
-                try { launcher.getClass().getMethod("r", boolean.class).invoke(launcher, false); }
-                catch (ReflectiveOperationException error) { throw new IllegalStateException(error); }
-            });
-            waitForIdleSync();
-            check(chooser.get() != null, "Stock Send log opens its chooser for an existing log");
-            Intent payload = (Intent)chooser.get().getParcelableExtra(Intent.EXTRA_INTENT);
-            List<android.net.Uri> attachments = payload.getParcelableArrayListExtra(Intent.EXTRA_STREAM);
-            check(attachments.stream().anyMatch(uri -> "naruto.log".equals(uri.getLastPathSegment())),
-                "An existing renderer log can still be shared");
-            check(attachments.stream().noneMatch(uri -> "session-details.txt".equals(uri.getLastPathSegment())
-                || "tombstone.pb".equals(uri.getLastPathSegment())), "The stock share excludes old diagnostic attachments");
-            check("Existing share fixture\n".equals(read(files[1])), "Send log does not rewrite a previous session report");
+            java.nio.file.Files.createDirectories(files[1].getParentFile().toPath());
+            write(files[0], "Existing renderer log fixture\n");
+            write(files[1], "Update fixture\n");
+            String authority = "content://" + context.getPackageName() + ".logs/";
+            android.net.Uri update = android.net.Uri.parse(authority + "update.apk");
+            try (java.io.InputStream stream = context.getContentResolver().openInputStream(update)) {
+                check(stream != null && stream.read() == 'U', "The installer can still read the downloaded APK");
+            }
+            android.net.Uri log = android.net.Uri.parse(authority + "naruto.log");
+            try (java.io.InputStream ignored = context.getContentResolver().openInputStream(log)) {
+                throw new AssertionError("The update provider still exposes renderer logs");
+            } catch (java.io.FileNotFoundException expected) {
+                check(true, "The update provider refuses old renderer logs");
+            }
         } finally {
-            removeMonitor(monitor);
             for (int i = 0; i < files.length; i++) {
                 if (previous[i] == null) java.nio.file.Files.deleteIfExists(files[i].toPath());
                 else java.nio.file.Files.write(files[i].toPath(), previous[i]);
@@ -498,22 +481,57 @@ public final class R2Instrumentation extends Instrumentation {
     }
     private void testNativeSampling(Context context,ClassLoader loader)throws Exception {
         Class<?> samples=Class.forName("com.naruto.r2.NativeSamples",true,loader),sourceType=Class.forName("com.naruto.r2.NativeSamples$Source",true,loader),game=Class.forName("com.naruto.port.NarutoActivity",true,loader),hooks=Class.forName("com.naruto.r2.GameHooks",true,loader),startup=Class.forName("com.naruto.r2.StartupFeedback",true,loader);
+        Class<?> loop=Class.forName("com.naruto.r2.GameLoop",true,loader);
+        Method tick=loop.getMethod("tick",int.class,android.view.KeyEvent.Callback.class);
+        Method stockSample=loop.getMethod("stockSample",game,float[].class);
+        Method prepared=loop.getMethod("stockPrepared",game);
+        Method begin=startup.getMethod("begin",game);
+        Field active=hooks.getField("active");
+        boolean previousActive=active.getBoolean(null);
+        SharedPreferences prefs=context.getSharedPreferences("naruto",0);
+        boolean hadStats=prefs.contains("menu_stats"), previousStats=prefs.getBoolean("menu_stats",true);
         Field source=samples.getDeclaredField("source");source.setAccessible(true);Object original=source.get(null);Object[] instance={null};Throwable[] failure={null};
         java.util.concurrent.CountDownLatch entered=new java.util.concurrent.CountDownLatch(1),release=new java.util.concurrent.CountDownLatch(1);java.util.concurrent.atomic.AtomicInteger reads=new java.util.concurrent.atomic.AtomicInteger();java.util.concurrent.atomic.AtomicBoolean offMain=new java.util.concurrent.atomic.AtomicBoolean();
         Object fake=java.lang.reflect.Proxy.newProxyInstance(loader,new Class<?>[]{sourceType},(proxy,m,args)->{reads.incrementAndGet();offMain.set(android.os.Looper.myLooper()!=android.os.Looper.getMainLooper());entered.countDown();release.await(5,java.util.concurrent.TimeUnit.SECONDS);return new float[]{30,20,2000,40,600,2,60};});
         runOnMainSync(()->{try{instance[0]=game.getConstructor().newInstance();Method attach=android.content.ContextWrapper.class.getDeclaredMethod("attachBaseContext",Context.class);attach.setAccessible(true);attach.invoke(instance[0],context);}catch(Throwable e){failure[0]=e;}});
         if(failure[0]!=null)throw new RuntimeException(failure[0]);
         try{
-            source.set(null,fake);hooks.getField("active").setBoolean(null,true);
-            runOnMainSync(()->{try{for(int i=0;i<5;i++)samples.getMethod("request",game).invoke(null,instance[0]);}catch(Throwable e){failure[0]=e;}});
+            source.set(null,fake);active.setBoolean(null,true);
+            prefs.edit().putBoolean("menu_stats",true).commit();
+            runOnMainSync(()->{try{
+                Object owner=instance[0];
+                begin.invoke(null,owner);
+                stockSample.invoke(null,owner,new float[]{30});
+                check(Boolean.FALSE.equals(tick.invoke(null,1,owner)),"An early frame keeps the stock polling path during shader preparation");
+                begin.invoke(null,owner);
+                prepared.invoke(null,owner);
+                stockSample.invoke(null,owner,new float[]{Float.NaN});
+                check(Boolean.FALSE.equals(tick.invoke(null,1,owner))&&reads.get()==0,"A valid game FPS sample is required before the background worker starts");
+                stockSample.invoke(null,owner,new float[]{30});
+                check(Boolean.TRUE.equals(tick.invoke(null,1,owner)),"The first valid sample after shader preparation switches to background polling");
+                for(int i=0;i<4;i++)samples.getMethod("request",game).invoke(null,owner);
+            }catch(Throwable e){failure[0]=e;}});
+            if(failure[0]!=null)throw new RuntimeException(failure[0]);
             check(entered.await(5,java.util.concurrent.TimeUnit.SECONDS)&&offMain.get(),"Native statistics read executes on the dedicated worker rather than the UI thread");
             check(reads.get()==1,"Repeated UI polling cannot queue overlapping native samples");
-            runOnMainSync(()->{try{samples.getMethod("cancel",game).invoke(null,instance[0]);}catch(Throwable e){failure[0]=e;}});release.countDown();SystemClock.sleep(200);waitForIdleSync();
+            runOnMainSync(()->{try{
+                loop.getMethod("pause",game).invoke(null,instance[0]);
+                android.os.Handler handler=(android.os.Handler)game.getField("statsHandler").get(instance[0]);
+                Runnable update=(Runnable)game.getField("statsUpdater").get(instance[0]);
+                check(!handler.hasCallbacks(update),"Pausing removes scheduled background FPS reads");
+            }catch(Throwable e){failure[0]=e;}});release.countDown();SystemClock.sleep(200);waitForIdleSync();
             String observed=(String)samples.getMethod("observations",game).invoke(null,instance[0]);check(observed.contains("samples 0"),"Cancelled background samples cannot publish into a paused game");
-            runOnMainSync(()->{try{startup.getMethod("begin",game).invoke(null,instance[0]);startup.getMethod("prepared",game).invoke(null,instance[0]);startup.getMethod("sample",game,float[].class).invoke(null,instance[0],new float[]{30});}catch(Throwable e){failure[0]=e;}});
             check(!(Boolean)startup.getMethod("waiting",game).invoke(null,instance[0]),"Startup feedback completes after the first valid game FPS observation");
             if(failure[0]!=null)throw new RuntimeException(failure[0]);
-        }finally{release.countDown();runOnMainSync(()->{try{samples.getMethod("destroy",game).invoke(null,instance[0]);startup.getMethod("destroy",game).invoke(null,instance[0]);}catch(Exception e){throw new RuntimeException(e);}});source.set(null,original);}
+        }finally{
+            release.countDown();
+            runOnMainSync(()->{try{loop.getMethod("destroy",game).invoke(null,instance[0]);}catch(Exception e){throw new RuntimeException(e);}});
+            source.set(null,original);
+            active.setBoolean(null,previousActive);
+            SharedPreferences.Editor restore=prefs.edit();
+            if(hadStats)restore.putBoolean("menu_stats",previousStats);else restore.remove("menu_stats");
+            restore.commit();
+        }
     }
     private void testSharedPresentation(Context context,ClassLoader loader,List<View> views)throws Exception {
         android.content.pm.ActivityInfo game=context.getPackageManager().getActivityInfo(new android.content.ComponentName(context.getPackageName(),"com.naruto.port.NarutoActivity"),0);
@@ -653,7 +671,7 @@ public final class R2Instrumentation extends Instrumentation {
                 result.putString("stream","R2_ANDROID_RESULT=PASS assertions="+assertions+" profile=original-startup\n");
                 finish(Activity.RESULT_OK,result);return;
             }
-            check("R1.1".equals(version),"Installed version is R1.1");
+            check("R1.2".equals(version),"Installed version is R1.2");
             prefs.edit().putBoolean("logging_enabled",true).commit();
             ClassLoader loader=context.getClassLoader();
             Class<?> control=Class.forName("com.naruto.port.LoggingControl",true,loader);
@@ -666,7 +684,7 @@ public final class R2Instrumentation extends Instrumentation {
             final List<View> views=new ArrayList<>();
             runOnMainSync(new Runnable(){public void run(){collect(launcher.getWindow().getDecorView(),views);}});
             check(!hasText(views,"Logging")&&!hasText(views,"Capture app logs"),"Automatic logging and its launcher switch are removed");
-            View stockLog=named(views,"Send log");check(stockLog!=null&&stockLog.getVisibility()==View.VISIBLE&&stockLog.hasOnClickListeners(),"Original Send log action remains visible and connected");
+            check(!hasText(views,"Send log")&&hasText(views,"Licenses"),"The launcher footer contains Licenses and has no log-sharing action");
             check(hasText(views,"Modified and Translated by XHYN_PH"),"YouTube footer has the requested text");
             check(!hasText(views,"PT-BR")&&!hasText(views,"Portuguese text"),"PT-BR option is absent");
             verifyR2(context,loader,views);

@@ -25,8 +25,8 @@ public final class Performance {
  public static boolean recoveryAllowed(boolean active,boolean focused,boolean finishing,int attempts){return active&&focused&&!finishing&&attempts<2;}
  public static boolean rateMatches(float expected,float observed){return Float.isFinite(expected)&&Float.isFinite(observed)&&expected>0&&observed>0&&Math.abs(expected-observed)<1f;}
  public static int retryBudget(int attempts,long elapsed){return elapsed>=30000?0:attempts;}
- public static void refresh(NarutoActivity a,int multiplier,int explicit){
-  State state=states.get(a);if(state==null){state=new State();states.put(a,state);}state.multiplier=multiplier;state.explicit=explicit;apply(a,state);
+ public static void remember(NarutoActivity a,int multiplier,int explicit){
+  State state=states.get(a);if(state==null){state=new State();states.put(a,state);}state.multiplier=multiplier;state.explicit=explicit;
  }
  private static void apply(NarutoActivity a,State state){
   int target=state.explicit>0?state.explicit:targetRefresh(state.multiplier);a.surfaceFrameRate=target;

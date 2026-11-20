@@ -25,7 +25,7 @@ def digest(path):
 
 def build(args):
     compatibility_profile = args.startup_test or args.turnip_trace
-    version_name = 'R1-startup-test2' if compatibility_profile else 'R1.1'
+    version_name = 'R1-startup-test2' if compatibility_profile else 'R1.2'
     if args.turnip_trace:
         version_name = crash_trace.VERSION
     # Equal version codes permit installing either test or R1 over the other without deleting data.
@@ -87,13 +87,14 @@ def build(args):
         run(sys.executable, r2/'customize.py', decoded)
         sys.path.insert(0, str(r2))
         import startup_test
-        startup_test.apply(reference, decoded, diagnostic=compatibility_profile)
+        startup_test.apply(reference, decoded, optimize_after_startup=not compatibility_profile)
         if not compatibility_profile:
             import disable_logging
+            import overlay_patches
             disable_logging.apply(decoded)
+            overlay_patches.verify_stock(reference, decoded)
             verification_version.append('--disable-logging')
         run(sys.executable, r2/'verify_linkage.py', decoded)
-        startup_test.verify(reference, decoded, diagnostic=compatibility_profile)
         controller = Path('com/naruto/port/ControllerMapActivity.smali')
         if (reference/'smali'/controller).read_bytes() != (decoded/'smali'/controller).read_bytes():
             raise ValueError('The stock controller mapping screen changed')

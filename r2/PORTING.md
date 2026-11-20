@@ -12,7 +12,7 @@ The retained customization code comes from STORM 2 R1 and STORM 3 R1–R2.4. The
 | Switch interface callback | `a.u0.a(boolean)` |
 | Driver descriptor / importer / menu gate | `a.h` / `a.i.k(Context, InputStream)` / `a.i.q()` |
 | Selected driver / selection | `q()` / `p(String)` |
-| Original Send log | `r(boolean)`; all eight original attachments retained |
+| APK update handoff | The regular build serves `update.apk` through the original installer URI |
 | Touch view / button / stick / listener | `a.l0` / `a.i0` / `a.k0` / `a.j0` |
 | Statistics / floating menu / drag | `a.g0` / `a.f0` / `a.e0` |
 | Native polling dispatcher | `a.H` |

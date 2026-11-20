@@ -11,13 +11,13 @@ import java.nio.file.*;
 import java.util.*;
 
 public final class GameHooks {
-    public static boolean active=true,preparationDone,returnToLauncher;
+    public static boolean active=true,returnToLauncher;
     private static RandomAccessFile gameLockFile;
     private static FileLock gameLock;
     public static SharedPreferences prefs(Context c){return c.getSharedPreferences("naruto",0);}
     public static void beforeLauncher(Activity a){prefs(a).edit().remove("r2_graph").remove("r2_rumble").remove("r2_rumble_strength").remove("r2_touch_right").remove("r2_touch_gain").remove("r2_left_deadzone").remove("r2_right_deadzone").remove("r2_right_axes").remove("r2_right_invert").remove("r2_ps_labels").apply();if(!a.getIntent().hasExtra("trailer"))a.getIntent().putExtra("trailer",prefs(a).getBoolean("r2_video",true));}
     public static void gameStart(Activity a){
-        active=true;preparationDone=false;returnToLauncher=false;
+        active=true;returnToLauncher=false;
         try{gameLockFile=new RandomAccessFile(new File(a.getFilesDir(),"r2-game.lock"),"rw");gameLock=gameLockFile.getChannel().tryLock();
             if(gameLock==null)throw new IOException("A save operation is in progress. Close and reopen the game after it finishes.");
         }catch(IOException|OverlappingFileLockException e){try{if(gameLockFile!=null)gameLockFile.close();}catch(IOException ignored){}gameLockFile=null;gameLock=null;android.widget.Toast.makeText(a,"Save management is in progress. Try starting the game again when it finishes.",android.widget.Toast.LENGTH_LONG).show();a.finish();}

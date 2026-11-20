@@ -11,8 +11,8 @@ public final class StartupFeedback {
     private static final WeakHashMap<NarutoActivity,State> states=new WeakHashMap<>();
     private static final class State {boolean prepared,first;long started=SystemClock.uptimeMillis();}
     public static void begin(NarutoActivity a){states.put(a,new State());}
+    static boolean ready(NarutoActivity a){State s=states.get(a);return s!=null&&s.prepared&&s.first;}
     public static boolean waiting(NarutoActivity a){State s=states.get(a);return s!=null&&!s.first&&GameHooks.prefs(a).getBoolean("menu_stats",true)&&SystemClock.uptimeMillis()-s.started<20000;}
-    public static void expire(NarutoActivity a){State s=states.get(a);if(s!=null&&s.prepared&&!waiting(a))hide(a);}
     public static void prepared(NarutoActivity a){
         State s=states.get(a);if(s==null)return;s.prepared=true;
         if(!waiting(a)){hide(a);return;}

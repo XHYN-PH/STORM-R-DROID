@@ -1,6 +1,6 @@
-# Build STORM R R1.1
+# Build STORM R R1.2
 
-This repository adapts the retained STORM 3 R1–R2.4 customization modules to the pinned STORM R v1.1.11 APK. The regular build is **STORM R R1.1** (`com.naruto.storm4`, version code **122**). It disables automatic app logging and uses the original game startup path verified in the Trace 2 gameplay test.
+This repository adapts the retained STORM 3 R1–R2.4 customization modules to the pinned STORM R v1.1.11 APK. The regular build is **STORM R R1.2** (`com.naruto.storm4`, version code **122**). It uses the original initial refresh request and polling from Trace 2. After shader preparation and a valid game FPS reading, it uses background statistics and foreground refresh recovery. The regular build suppresses automatic app logs and omits the log-sharing action.
 
 ## Dependencies
 

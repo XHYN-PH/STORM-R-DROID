@@ -17,7 +17,7 @@ STORM R is my modified English edition of the [original native port](https://git
 
 The focus is a cleaner interface, more useful Android options and less unnecessary work in the menus and overlays. Performance and compatibility still depend on the phone, driver and game scene.
 
-**Turnip compatibility.** Trace 2 completed a gameplay session on an Adreno 750 with Turnip Gen8 V39-patched, 1080p and 2× frame generation. R1.1 uses the same startup and menu behavior with automatic logging disabled. [Trace 2 release](https://github.com/XHYN-PH/STORM-R-DROID/releases/tag/R1-turnip-trace2)
+**Turnip compatibility.** Trace 2 completed a gameplay session on an Adreno 750 with Turnip Gen8 V39-patched, 1080p and 2× frame generation. R1.2 uses that startup path. Background native FPS sampling and refresh recovery start after shader preparation and a valid game FPS reading. [Trace 2 release](https://github.com/XHYN-PH/STORM-R-DROID/releases/tag/R1-turnip-trace2)
 
 ## What changed from the original?
 
@@ -31,9 +31,9 @@ The focus is a cleaner interface, more useful Android options and less unnecessa
 | Display choices | Fit and Stretch | Fit, Stretch and proportional Crop to fill the display |
 | In-game options | Basic display/control options | Touch visibility and opacity, brightness, panel size and confirmed return to launcher |
 | GPU driver imports | Qualcomm-only picker | Turnip for Adreno, plus experimental PanVK for compatible Mali and RADV for compatible Xclipse |
-| Logging | Regular app log capture | R1.1 disables automatic app logging. **Send log** can share existing logs and driver status. |
+| Logging | Regular app log capture and sharing | Automatic app logging and log sharing are removed |
 
-The launcher uses Revolution’s layout, touch controls, controller mappings and graphics controls. The game language is set to English. R1.1 uses the original touch drawing and game statistics polling from Trace 2, with the smaller adjustable statistics panel and shared STORM 2/3 menus. See the [release history](#release-history) for changes in each version.
+The launcher uses Revolution’s layout, touch controls, controller mappings and graphics controls. The game language is set to English. R1.2 reuses button and stick artwork, reduces overlay redraw work, and shows loading status after shader preparation. It uses the shared STORM 2 and STORM 3 menus and adjustable statistics panel.
 
 ## Requirements
 
@@ -73,7 +73,7 @@ Copy the complete extracted disc folder; selecting an executable alone is not en
 - **Return to the launcher:** wait for the game's save indicator to finish, then choose **Return to launcher** and confirm. Wait for **Closing game…** to finish before managing saves. Exiting does not create a manual save.
 - **Export or back up saves:** open **More options → Saves**. Export reads your current save without changing it. Backup restoration is blocked while the game is running or the bundled 100% save is active. The bundled STORM R 100% save is preserved.
 - **Fill the display:** **Fit** keeps the full image, **Stretch** changes its proportions, and **Crop** fills the display by cutting off edges while keeping proportions. Crop does not expand the game's camera view.
-- **Share an existing log:** tap **Send log** in the launcher footer and choose where to share the available files.
+- **Restore default shadows:** choose **More options → Display → Shadows → Auto (original)** after using a custom cap.
 
 ## GPU drivers
 
@@ -96,13 +96,13 @@ Additional PanVK/RADV packages are downloaded separately. Successful import does
 - **[GitHub releases](https://github.com/XHYN-PH/STORM-R-DROID/releases)** — APK downloads and release notes.
 - **[Report an issue](https://github.com/XHYN-PH/STORM-R-DROID/issues)** — describe what happened and how to reproduce it.
 
-For bug reports, include your phone model, Android version, app version, GPU driver and the affected game mode or scene. Include any relevant files available under **Send log**.
+For bug reports, include your phone model, Android version, app version, GPU driver and the affected game mode or scene.
 
 ## Release history
 
 - [R1 — English interface, refined menus, save tools, display options and experimental driver imports](CHANGELOG_R1.md).
 
-This edition brings the retained customizations developed for [STORM 3 R1–R2.4](https://github.com/XHYN-PH/STORM-3-DROID) to STORM R. It uses Revolution’s own engine, `STORMR.S` save format and bundled 100% save. STORM 2 and 3 saves are incompatible. The rumble/right-stick helpers, controller preview, performance history and added diagnostics exporter that were removed from STORM 3 are excluded here too. The stock controller mapping screen and original Send log remain.
+This edition brings the retained STORM 3 R1–R2.4 customizations to STORM R. It uses Revolution’s engine, controller mapping screen, `STORMR.S` save format and bundled 100% save. Use a Revolution save when importing or restoring progress. [STORM 3 project](https://github.com/XHYN-PH/STORM-3-DROID)
 
 ## Source code and limitations
 

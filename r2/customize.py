@@ -5,6 +5,16 @@ import re,shutil,argparse
 import overlay_patches
 from pathlib import Path
 ROOT=Path(__file__).resolve().parent
+REMEMBER_REFRESH = '    invoke-static/range {p0 .. p2}, Lcom/naruto/r2/Performance;->remember(Lcom/naruto/port/NarutoActivity;II)V'
+STATS_DISPATCH = '''    iget v0, p0, La/H;->a:I
+    iget-object v1, p0, La/H;->b:Lcom/naruto/port/NarutoActivity;
+    invoke-static {v0, v1}, Lcom/naruto/r2/GameLoop;->tick(ILandroid/view/KeyEvent$Callback;)Z
+    move-result v0
+    if-eqz v0, :r2_stock_tick
+    return-void
+    :r2_stock_tick'''
+STOCK_SAMPLE = '    invoke-static {v1, v0}, Lcom/naruto/r2/GameLoop;->stockSample(Lcom/naruto/port/NarutoActivity;[F)V'
+STOCK_PREPARED = '    invoke-static {v1}, Lcom/naruto/r2/GameLoop;->stockPrepared(Lcom/naruto/port/NarutoActivity;)V'
 
 def change(path,signature,fn):
  source=path.read_text();pattern=re.compile(r'^'+re.escape(signature)+r'\n.*?^\.end method$',re.M|re.S)
@@ -18,6 +28,18 @@ def start(body,call):
  return updated
 def returns(body,call):return body.replace('    return-void',call+'\n\n    return-void')
 def call(method,signature,last=0):return f'    invoke-static/range {{p0 .. p{last}}}, Lcom/naruto/r2/{method};->{signature}'
+
+def gameplay_dispatcher(body):
+    hooks = {
+        '    invoke-virtual {v2, v0}, La/g0;->setValues([F)V': STOCK_SAMPLE,
+        '    invoke-virtual {p0, v0}, Landroid/view/View;->setVisibility(I)V': STOCK_PREPARED,
+    }
+    for original, hook in hooks.items():
+        if body.count(original) != 1:
+            raise ValueError('Unexpected original game callback')
+        body = body.replace(original, original + '\n\n' + hook)
+    return start(body, STATS_DISPATCH)
+
 def customize(root):
  smali=root/'smali';runtime=ROOT/'.build/runtime/decoded/smali/com/naruto/r2'
  if not runtime.is_dir():raise ValueError('Compile the R2 runtime first')
@@ -88,8 +110,8 @@ def customize(root):
   source+=f"\n.method public r2{method[0].upper()+method[1:]}({types})V\n    .locals 0\n    invoke-direct/range {{p0 .. p{len(types)}}}, Lcom/naruto/port/NarutoActivity;->{method}({types})V\n    return-void\n.end method\n"
  source+='\n.method public r2GameThread()Ljava/lang/Thread;\n    .locals 1\n    sget-object v0, Lorg/libsdl/app/SDLActivity;->mSDLThread:Ljava/lang/Thread;\n    return-object v0\n.end method\n.method public onPause()V\n    .locals 0\n    invoke-static {p0}, Lcom/naruto/r2/GameLoop;->pause(Lcom/naruto/port/NarutoActivity;)V\n    invoke-super {p0}, Lorg/libsdl/app/SDLActivity;->onPause()V\n    return-void\n.end method\n.method public onResume()V\n    .locals 0\n    invoke-super {p0}, Lorg/libsdl/app/SDLActivity;->onResume()V\n    invoke-static {p0}, Lcom/naruto/r2/GameLoop;->resume(Lcom/naruto/port/NarutoActivity;)V\n    return-void\n.end method\n'
  game.write_text(source)
- with game.open('a') as out:out.write('\n.method public onWindowFocusChanged(Z)V\n    .locals 0\n    invoke-super {p0, p1}, Lorg/libsdl/app/SDLActivity;->onWindowFocusChanged(Z)V\n    invoke-static {p0, p1}, Lcom/naruto/r2/SessionDetails;->focus(Lcom/naruto/port/NarutoActivity;Z)V\n    invoke-static {p0, p1}, Lcom/naruto/r2/Performance;->focus(Lcom/naruto/port/NarutoActivity;Z)V\n    return-void\n.end method\n')
- change(game,'.method private requestRefreshRate(II)V',lambda b:'.method private requestRefreshRate(II)V\n    .locals 0\n'+call('Performance','refresh(Lcom/naruto/port/NarutoActivity;II)V',2)+'\n    return-void\n.end method')
+ with game.open('a') as out:out.write('\n.method public onWindowFocusChanged(Z)V\n    .locals 0\n    invoke-super {p0, p1}, Lorg/libsdl/app/SDLActivity;->onWindowFocusChanged(Z)V\n    invoke-static {p0, p1}, Lcom/naruto/r2/SessionDetails;->focus(Lcom/naruto/port/NarutoActivity;Z)V\n    invoke-static {p0, p1}, Lcom/naruto/r2/GameLoop;->focus(Lcom/naruto/port/NarutoActivity;Z)V\n    return-void\n.end method\n')
+ change(game,'.method private requestRefreshRate(II)V',lambda b:start(b,REMEMBER_REFRESH))
  change(game,'.method public onBackPressed()V',lambda b:'.method public onBackPressed()V\n    .locals 0\n'+call('GameMenu','back(Lcom/naruto/port/NarutoActivity;)V')+'\n    return-void\n.end method')
  # The original method reuses p0 for the emblem. Keep the Activity in a wrapper.
  source=game.read_text().replace('.method private applyControllerMode()V','.method private r2OriginalControllerMode()V')
@@ -97,7 +119,7 @@ def customize(root):
  game.write_text(source)
  change(game,'.method public onDestroy()V',lambda b:start(b,call('GameLoop','destroy(Lcom/naruto/port/NarutoActivity;)V')))
  change(smali/'a/e0.smali','.method public final onTouch(Landroid/view/View;Landroid/view/MotionEvent;)Z',lambda b:'.method public final onTouch(Landroid/view/View;Landroid/view/MotionEvent;)Z\n    .locals 1\n    iget-object v0, p0, La/e0;->f:La/f0;\n    invoke-static {v0, p1, p2}, Lcom/naruto/r2/GameMenu;->touch(La/f0;Landroid/view/View;Landroid/view/MotionEvent;)Z\n    move-result v0\n    return v0\n.end method')
- change(smali/'a/H.smali','.method public final run()V',lambda b:start(b,'    iget v0, p0, La/H;->a:I\n    iget-object v1, p0, La/H;->b:Lcom/naruto/port/NarutoActivity;\n    invoke-static {v0, v1}, Lcom/naruto/r2/GameLoop;->tick(ILandroid/view/KeyEvent$Callback;)Z\n    move-result v0\n    if-eqz v0, :r2_stock_tick\n    return-void\n    :r2_stock_tick'))
+ change(smali/'a/H.smali','.method public final run()V',gameplay_dispatcher)
  # Track the stock repeating Play-button animation, preserving its appearance.
  source=launcher.read_text();needle='    invoke-virtual {v1}, Landroid/animation/ValueAnimator;->start()V'
  if source.count(needle)!=1:raise ValueError('Play animator changed')
